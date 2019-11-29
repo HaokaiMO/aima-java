@@ -1,10 +1,10 @@
 package aima.core.search.nondeterministic;
 
-import aima.core.search.framework.problem.ActionsFunction;
-import aima.core.search.framework.problem.DefaultStepCostFunction;
-import aima.core.search.framework.problem.GoalTest;
-import aima.core.search.framework.problem.ResultFunction;
 import aima.core.search.framework.problem.StepCostFunction;
+
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Non-deterministic problems may have multiple results for a given state and
@@ -12,48 +12,34 @@ import aima.core.search.framework.problem.StepCostFunction;
  * ResultFunction (one result) with ResultsFunction (a set of results).
  * 
  * @author Andrew Brown
+ * @author Ruediger Lunde
  */
-public class NondeterministicProblem {
+public class NondeterministicProblem<S, A> {
 
-	protected Object initialState;
-	protected ActionsFunction actionsFunction;
-	protected ResultFunction resultFunction;
-	protected GoalTest goalTest;
-	protected StepCostFunction stepCostFunction;
-	protected ResultsFunction resultsFunction;
+	protected S initialState;
+	protected Function<S, List<A>> actionsFn;
+	protected Predicate<S> goalTest;
+	protected StepCostFunction<S, A> stepCostFn;
+	protected ResultsFunction<S, A> resultsFn;
 
 	/**
 	 * Constructor
-	 * 
-	 * @param initialState
-	 * @param actionsFunction
-	 * @param resultsFunction
-	 * @param goalTest
 	 */
-	public NondeterministicProblem(Object initialState,
-			ActionsFunction actionsFunction, ResultsFunction resultsFunction,
-			GoalTest goalTest) {
-		this(initialState, actionsFunction, resultsFunction, goalTest,
-				new DefaultStepCostFunction());
+	public NondeterministicProblem(S initialState, Function<S, List<A>> actionsFn, ResultsFunction<S, A> resultsFn,
+								   Predicate<S> goalTest) {
+		this(initialState, actionsFn, resultsFn, goalTest, (s, a, sPrimed) -> 1.0);
 	}
 
 	/**
 	 * Constructor
-	 * 
-	 * @param initialState
-	 * @param actionsFunction
-	 * @param resultsFunction
-	 * @param goalTest
-	 * @param stepCostFunction
 	 */
-	public NondeterministicProblem(Object initialState,
-			ActionsFunction actionsFunction, ResultsFunction resultsFunction,
-			GoalTest goalTest, StepCostFunction stepCostFunction) {
+	public NondeterministicProblem(S initialState, Function<S, List<A>> actionsFn, ResultsFunction<S, A> resultsFn,
+								   Predicate<S> goalTest, StepCostFunction<S, A> stepCostFn) {
 		this.initialState = initialState;
-		this.actionsFunction = actionsFunction;
-		this.resultsFunction = resultsFunction;
+		this.actionsFn = actionsFn;
+		this.resultsFn = resultsFn;
 		this.goalTest = goalTest;
-		this.stepCostFunction = stepCostFunction;
+		this.stepCostFn = stepCostFn;
 	}
 
 	/**
@@ -61,7 +47,7 @@ public class NondeterministicProblem {
 	 * 
 	 * @return the initial state of the agent.
 	 */
-	public Object getInitialState() {
+	public S getInitialState() {
 		return initialState;
 	}
 
@@ -70,26 +56,15 @@ public class NondeterministicProblem {
 	 * 
 	 * @return <code>true</code> if the given state is a goal state.
 	 */
-	public boolean isGoalState(Object state) {
-		return goalTest.isGoalState(state);
-	}
-
-	/**
-	 * Returns the goal test.
-	 * 
-	 * @return the goal test.
-	 */
-	public GoalTest getGoalTest() {
-		return goalTest;
+	public boolean testGoal(S state) {
+		return goalTest.test(state);
 	}
 
 	/**
 	 * Returns the description of the possible actions available to the agent.
-	 * 
-	 * @return the description of the possible actions available to the agent.
 	 */
-	public ActionsFunction getActionsFunction() {
-		return actionsFunction;
+	List<A> getActions(S state) {
+		return actionsFn.apply(state);
 	}
 
 	/**
@@ -97,16 +72,15 @@ public class NondeterministicProblem {
 	 * 
 	 * @return the description of what each action does.
 	 */
-	public ResultsFunction getResultsFunction() {
-		return this.resultsFunction;
+	public List<S> getResults(S state, A action) {
+		return this.resultsFn.results(state, action);
 	}
 
 	/**
-	 * Returns the path cost function.
-	 * 
-	 * @return the path cost function.
+	 * Returns the <b>step cost</b> of taking action <code>action</code> in state <code>state</code> to reach state
+	 * <code>stateDelta</code> denoted by c(s, a, s').
 	 */
-	public StepCostFunction getStepCostFunction() {
-		return stepCostFunction;
+	double getStepCosts(S state, A action, S stateDelta) {
+		return stepCostFn.applyAsDouble(state, action, stateDelta);
 	}
 }

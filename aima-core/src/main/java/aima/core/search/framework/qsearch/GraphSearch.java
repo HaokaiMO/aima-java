@@ -1,11 +1,12 @@
 package aima.core.search.framework.qsearch;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 
 import aima.core.search.framework.Node;
-import aima.core.search.framework.NodeExpander;
+import aima.core.search.framework.NodeFactory;
 import aima.core.search.framework.problem.Problem;
 
 /**
@@ -28,35 +29,40 @@ import aima.core.search.framework.problem.Problem;
  * Figure 3.7 An informal description of the general graph-search algorithm.
  * <br>
  * This implementation is based on the template method
- * {@link QueueSearch#findNode(Problem, Queue)} of the superclass and provides
- * implementations for the needed primitive operations. In contrast to the code
+ * {@link TreeSearch#findNode(Problem, Queue)} of the superclass and provides
+ * implementations for the primitive operations including node filtering mechanisms
+ * to avoid that nodes of already explored states are selected for expansion.
+ * In contrast to the pseudocode
  * above, here, nodes resulting from node expansion are added to the frontier
  * even if nodes for the same states already exist there. This makes it possible
  * to use the implementation also in combination with priority queue frontiers.
  * This implementation avoids linear costs for frontier node removal (compared
  * to {@link GraphSearchReducedFrontier}) and gets by without node comparator
  * knowledge.
- * 
+ *
+ * @param <S> The type used to represent states
+ * @param <A> The type of the actions to be used to navigate through the state space
+ *
  * @author Ruediger Lunde
  */
-public class GraphSearch extends QueueSearch {
+public class GraphSearch<S, A> extends TreeSearch<S, A> {
 
-	private Set<Object> explored = new HashSet<Object>();
+	private Set<S> explored = new HashSet<>();
 
 	public GraphSearch() {
-		this(new NodeExpander());
+		this(new NodeFactory<>());
 	}
 
-	public GraphSearch(NodeExpander nodeExpander) {
-		super(nodeExpander);
+	public GraphSearch(NodeFactory<S, A> nodeFactory) {
+		super(nodeFactory);
 	}
 
 	/**
 	 * Clears the set of explored states and calls the search implementation of
-	 * {@link QueueSearch}.
+	 * {@link TreeSearch}.
 	 */
 	@Override
-	public Node findNode(Problem problem, Queue<Node> frontier) {
+	public Optional<Node<S, A>> findNode(Problem<S, A> problem, Queue<Node<S, A>> frontier) {
 		// initialize the explored set to be empty
 		explored.clear();
 		return super.findNode(problem, frontier);
@@ -67,7 +73,7 @@ public class GraphSearch extends QueueSearch {
 	 * was not yet explored.
 	 */
 	@Override
-	protected void addToFrontier(Node node) {
+	protected void addToFrontier(Node<S, A> node) {
 		if (!explored.contains(node.getState())) {
 			frontier.add(node);
 			updateMetrics(frontier.size());
@@ -83,10 +89,9 @@ public class GraphSearch extends QueueSearch {
 	 * @return the node at the head of the frontier.
 	 */
 	@Override
-	protected Node removeFromFrontier() {
-		cleanUpFrontier(); // not really necessary because isFrontierEmpty
-							// should be called before...
-		Node result = frontier.remove();
+	protected Node<S, A> removeFromFrontier() {
+		cleanUpFrontier(); // not really necessary because isFrontierEmpty should be called before...
+		Node<S, A> result = frontier.remove();
 		explored.add(result.getState());
 		updateMetrics(frontier.size());
 		return result;

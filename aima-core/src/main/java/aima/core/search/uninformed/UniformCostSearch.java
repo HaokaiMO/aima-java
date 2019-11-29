@@ -3,7 +3,8 @@ package aima.core.search.uninformed;
 import java.util.Comparator;
 
 import aima.core.search.framework.Node;
-import aima.core.search.framework.PrioritySearch;
+import aima.core.search.framework.QueueBasedSearch;
+import aima.core.search.framework.QueueFactory;
 import aima.core.search.framework.qsearch.GraphSearch;
 import aima.core.search.framework.qsearch.QueueSearch;
 
@@ -37,33 +38,24 @@ import aima.core.search.framework.qsearch.QueueSearch;
  * 
  * </br>
  * This implementation is more general. It supports TreeSearch, GraphSearch, and
- * BidirectionalSearch by delegating the search space exploration to an instance
- * of a QueueSearch implementation.
- * 
- * @author Ciaran O'Reilly
+ * BidirectionalSearch by delegating search execution to an instance
+ * of type {@link QueueSearch}.
+ *
  * @author Ruediger Lunde
- * 
+ * @author Ciaran O'Reilly
  */
-public class UniformCostSearch extends PrioritySearch {
+public class UniformCostSearch<S, A> extends QueueBasedSearch<S, A> {
 
 	/** Creates a UniformCostSearch instance using GraphSearch */
 	public UniformCostSearch() {
-		this(new GraphSearch());
+		this(new GraphSearch<>());
 	}
 
 	/**
 	 * Combines UniformCostSearch queue definition with the specified
-	 * search space exploration strategy.
+	 * search execution strategy.
 	 */
-	public UniformCostSearch(QueueSearch impl) {
-		super(impl, createPathCostComparator());
-	}
-
-	private static Comparator<Node> createPathCostComparator() {
-		return new Comparator<Node>() {
-			public int compare(Node node1, Node node2) {
-				return (new Double(node1.getPathCost()).compareTo(new Double(node2.getPathCost())));
-			}
-		};
+	public UniformCostSearch(QueueSearch<S, A> impl) {
+		super(impl, QueueFactory.createPriorityQueue(Comparator.comparing(Node::getPathCost)));
 	}
 }

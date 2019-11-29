@@ -1,18 +1,5 @@
 package aima.gui.swing.applications.search.games;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Properties;
-import java.util.Random;
-
-import javax.swing.JButton;
-
 import aima.core.agent.Action;
 import aima.core.agent.Agent;
 import aima.core.agent.Environment;
@@ -20,9 +7,8 @@ import aima.core.agent.Percept;
 import aima.core.agent.impl.AbstractEnvironment;
 import aima.core.environment.eightpuzzle.BidirectionalEightPuzzleProblem;
 import aima.core.environment.eightpuzzle.EightPuzzleBoard;
-import aima.core.environment.eightpuzzle.ManhattanHeuristicFunction;
-import aima.core.environment.eightpuzzle.MisplacedTilleHeuristicFunction;
-import aima.core.search.framework.SearchAgent;
+import aima.core.environment.eightpuzzle.EightPuzzleFunctions;
+import aima.core.search.agent.SearchAgent;
 import aima.core.search.framework.SearchForActions;
 import aima.core.search.framework.problem.Problem;
 import aima.core.search.framework.qsearch.BidirectionalSearch;
@@ -34,12 +20,16 @@ import aima.core.search.uninformed.BreadthFirstSearch;
 import aima.core.search.uninformed.DepthLimitedSearch;
 import aima.core.search.uninformed.IterativeDeepeningSearch;
 import aima.core.util.datastructure.XYLocation;
-import aima.gui.swing.framework.AgentAppController;
-import aima.gui.swing.framework.AgentAppEnvironmentView;
-import aima.gui.swing.framework.AgentAppFrame;
-import aima.gui.swing.framework.MessageLogger;
-import aima.gui.swing.framework.SimpleAgentApp;
-import aima.gui.swing.framework.SimulationThread;
+import aima.gui.swing.framework.*;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.Random;
 
 /**
  * Graphical 8-puzzle game application. It demonstrates the performance of
@@ -48,52 +38,54 @@ import aima.gui.swing.framework.SimulationThread;
  * 
  * @author Ruediger Lunde
  */
-public class EightPuzzleApp extends SimpleAgentApp {
+public class EightPuzzleApp extends SimpleAgentApp<Percept, Action> {
 
 	/** List of supported search algorithm names. */
-	protected static List<String> SEARCH_NAMES = new ArrayList<String>();
+	protected static List<String> SEARCH_NAMES = new ArrayList<>();
 	/** List of supported search algorithms. */
-	protected static List<SearchForActions> SEARCH_ALGOS = new ArrayList<SearchForActions>();
+	protected static List<SearchForActions<EightPuzzleBoard, Action>> SEARCH_ALGOS = new ArrayList<>();
 
 	/** Adds a new item to the list of supported search algorithms. */
-	public static void addSearchAlgorithm(String name, SearchForActions algo) {
+	public static void addSearchAlgorithm(String name, SearchForActions<EightPuzzleBoard, Action> algo) {
 		SEARCH_NAMES.add(name);
 		SEARCH_ALGOS.add(algo);
 	}
 
 	static {
 		addSearchAlgorithm("Breadth First Search (Graph Search)",
-				new BreadthFirstSearch(new GraphSearch()));
+				new BreadthFirstSearch<>(new GraphSearch<>()));
 		addSearchAlgorithm("Breadth First Search (Bidirectional Search)",
-				new BreadthFirstSearch(new BidirectionalSearch()));
-		addSearchAlgorithm("Depth Limited Search (9)", new DepthLimitedSearch(9));
-		addSearchAlgorithm("Iterative Deepening Search", new IterativeDeepeningSearch());
+				new BreadthFirstSearch<>(new BidirectionalSearch<>()));
+		addSearchAlgorithm("Depth Limited Search (9)", new DepthLimitedSearch<>(9));
+		addSearchAlgorithm("Iterative Deepening Search", new IterativeDeepeningSearch<>());
 		addSearchAlgorithm("Greedy Best First Search (MisplacedTileHeursitic)",
-				new GreedyBestFirstSearch(new GraphSearch(), new MisplacedTilleHeuristicFunction()));
+				new GreedyBestFirstSearch<>(new GraphSearch<>(),
+						EightPuzzleFunctions::getNumberOfMisplacedTiles));
 		addSearchAlgorithm("Greedy Best First Search (ManhattanHeursitic)",
-				new GreedyBestFirstSearch(new GraphSearch(), new ManhattanHeuristicFunction()));
+				new GreedyBestFirstSearch<>(new GraphSearch<>(),
+						EightPuzzleFunctions::getManhattanDistance));
 		addSearchAlgorithm("AStar Search (MisplacedTileHeursitic)",
-				new AStarSearch(new GraphSearch(), new MisplacedTilleHeuristicFunction()));
+				new AStarSearch<>(new GraphSearch<>(), EightPuzzleFunctions::getNumberOfMisplacedTiles));
 		addSearchAlgorithm("AStar Search (ManhattanHeursitic)",
-				new AStarSearch(new GraphSearch(), new ManhattanHeuristicFunction()));
+				new AStarSearch<>(new GraphSearch<>(), EightPuzzleFunctions::getManhattanDistance));
 		addSearchAlgorithm("Simulated Annealing Search",
-				new SimulatedAnnealingSearch(new ManhattanHeuristicFunction()));
+				new SimulatedAnnealingSearch<>(EightPuzzleFunctions::getManhattanDistance));
 	}
 
 	/** Returns an <code>EightPuzzleView</code> instance. */
-	public AgentAppEnvironmentView createEnvironmentView() {
+	public AgentAppEnvironmentView<Percept, Action> createEnvironmentView() {
 		return new EightPuzzleView();
 	}
 
 	/** Returns a <code>EightPuzzleFrame</code> instance. */
 	@Override
-	public AgentAppFrame createFrame() {
+	public AgentAppFrame<Percept, Action> createFrame() {
 		return new EightPuzzleFrame();
 	}
 
 	/** Returns a <code>EightPuzzleController</code> instance. */
 	@Override
-	public AgentAppController createController() {
+	public AgentAppController<Percept, Action> createController() {
 		return new EightPuzzleController();
 	}
 
@@ -113,7 +105,7 @@ public class EightPuzzleApp extends SimpleAgentApp {
 	/**
 	 * Adds some selectors to the base class and adjusts its size.
 	 */
-	protected static class EightPuzzleFrame extends AgentAppFrame {
+	protected static class EightPuzzleFrame extends AgentAppFrame<Percept, Action> {
 		private static final long serialVersionUID = 1L;
 		public static String ENV_SEL = "EnvSelection";
 		public static String SEARCH_SEL = "SearchSelection";
@@ -135,7 +127,8 @@ public class EightPuzzleApp extends SimpleAgentApp {
 	 * By pressing a button, the user can move the corresponding tile to the
 	 * adjacent gap.
 	 */
-	protected static class EightPuzzleView extends AgentAppEnvironmentView implements ActionListener {
+	protected static class EightPuzzleView extends AgentAppEnvironmentView<Percept, Action>
+			implements ActionListener {
 		private static final long serialVersionUID = 1L;
 		protected JButton[] squareButtons;
 
@@ -153,21 +146,21 @@ public class EightPuzzleApp extends SimpleAgentApp {
 		}
 
 		@Override
-		public void setEnvironment(Environment env) {
+		public void setEnvironment(Environment<? extends Percept, ? extends Action> env) {
 			super.setEnvironment(env);
+			showState();
+		}
+
+		@Override
+		public void agentAdded(Agent<?, ?> agent, Environment<?, ?> source) {
 			showState();
 		}
 
 		/** Agent value null indicates a user initiated action. */
 		@Override
-		public void agentActed(Agent agent, Action action, Environment source) {
+		public void agentActed(Agent<?, ?> agent, Percept percept, Action action, Environment<?, ?> source) {
 			showState();
 			notify((agent == null ? "User: " : "") + action.toString());
-		}
-
-		@Override
-		public void agentAdded(Agent agent, Environment source) {
-			showState();
 		}
 
 		/**
@@ -191,29 +184,30 @@ public class EightPuzzleApp extends SimpleAgentApp {
 				if (ae.getSource() == squareButtons[i]) {
 					EightPuzzleController contr = (EightPuzzleController) getController();
 					XYLocation locGap = ((EightPuzzleEnvironment) env).getBoard().getLocationOf(0);
-					if (locGap.getXCoOrdinate() == i / 3) {
-						if (locGap.getYCoOrdinate() == i % 3 - 1)
-							contr.executeUserAction(EightPuzzleBoard.RIGHT);
-						else if (locGap.getYCoOrdinate() == i % 3 + 1)
-							contr.executeUserAction(EightPuzzleBoard.LEFT);
-					} else if (locGap.getYCoOrdinate() == i % 3) {
-						if (locGap.getXCoOrdinate() == i / 3 - 1)
+					if (locGap.getX() == i % 3) {
+						if (locGap.getY() == i / 3 - 1)
 							contr.executeUserAction(EightPuzzleBoard.DOWN);
-						else if (locGap.getXCoOrdinate() == i / 3 + 1)
+						else if (locGap.getY() == i / 3 + 1)
 							contr.executeUserAction(EightPuzzleBoard.UP);
+					} else if (locGap.getY() == i / 3) {
+						if (locGap.getX() == i % 3 - 1)
+							contr.executeUserAction(EightPuzzleBoard.RIGHT);
+						else if (locGap.getX() == i % 3 + 1)
+							contr.executeUserAction(EightPuzzleBoard.LEFT);
 					}
 				}
 			}
+			showState();
 		}
 	}
 
 	/**
 	 * Defines how to react on standard simulation button events.
 	 */
-	protected static class EightPuzzleController extends AgentAppController {
+	protected static class EightPuzzleController extends AgentAppController<Percept, Action> {
 
 		protected EightPuzzleEnvironment env = null;
-		protected SearchAgent agent = null;
+		protected SearchAgent<Percept, EightPuzzleBoard, Action> agent = null;
 		protected boolean dirty;
 
 		/** Prepares next simulation. */
@@ -273,9 +267,9 @@ public class EightPuzzleApp extends SimpleAgentApp {
 		protected void addAgent() throws Exception {
 			if (agent == null) {
 				int pSel = frame.getSelection().getIndex(EightPuzzleFrame.SEARCH_SEL);
-				Problem problem = new BidirectionalEightPuzzleProblem(env.getBoard());
-				SearchForActions search = SEARCH_ALGOS.get(pSel);
-				agent = new SearchAgent(problem, search);
+				Problem<EightPuzzleBoard, Action> problem = new BidirectionalEightPuzzleProblem(env.getBoard());
+				SearchForActions<EightPuzzleBoard, Action> search = SEARCH_ALGOS.get(pSel);
+				agent = new SearchAgent<>(problem, search);
 				env.addAgent(agent);
 			}
 		}
@@ -318,7 +312,7 @@ public class EightPuzzleApp extends SimpleAgentApp {
 
 		/** Updates the status of the frame after simulation has finished. */
 		public void update(SimulationThread simulationThread) {
-			if (simulationThread.isCanceled()) {
+			if (simulationThread.isCancelled()) {
 				frame.setStatus("Task canceled.");
 			} else if (frame.simulationPaused()) {
 				frame.setStatus("Task paused.");
@@ -329,19 +323,18 @@ public class EightPuzzleApp extends SimpleAgentApp {
 
 		/** Provides a text with statistical information about the last run. */
 		private String getStatistics() {
-			StringBuffer result = new StringBuffer();
+			StringBuilder result = new StringBuilder();
 			Properties properties = agent.getInstrumentation();
-			Iterator<Object> keys = properties.keySet().iterator();
-			while (keys.hasNext()) {
-				String key = (String) keys.next();
+			for (Object o : properties.keySet()) {
+				String key = (String) o;
 				String property = properties.getProperty(key);
-				result.append("\n" + key + " : " + property);
+				result.append("\n").append(key).append(" : ").append(property);
 			}
 			return result.toString();
 		}
 
 		public void executeUserAction(Action action) {
-			env.executeAction(null, action);
+			env.execute(null, action);
 			agent = null;
 			dirty = true;
 			frame.updateEnabledState();
@@ -349,7 +342,7 @@ public class EightPuzzleApp extends SimpleAgentApp {
 	}
 
 	/** Simple environment maintaining just the current board state. */
-	protected static class EightPuzzleEnvironment extends AbstractEnvironment {
+	protected static class EightPuzzleEnvironment extends AbstractEnvironment<Percept, Action> {
 		EightPuzzleBoard board;
 
 		protected EightPuzzleEnvironment(EightPuzzleBoard board) {
@@ -362,7 +355,7 @@ public class EightPuzzleApp extends SimpleAgentApp {
 
 		/** Executes the provided action and returns null. */
 		@Override
-		public void executeAction(Agent agent, Action action) {
+		public void execute(Agent<?, ?> agent, Action action) {
 			if (action == EightPuzzleBoard.UP)
 				board.moveGapUp();
 			else if (action == EightPuzzleBoard.DOWN)
@@ -371,13 +364,11 @@ public class EightPuzzleApp extends SimpleAgentApp {
 				board.moveGapLeft();
 			else if (action == EightPuzzleBoard.RIGHT)
 				board.moveGapRight();
-			if (agent == null)
-				notifyEnvironmentViews(agent, action);
 		}
 
 		/** Returns null. */
 		@Override
-		public Percept getPerceptSeenBy(Agent anAgent) {
+		public Percept getPerceptSeenBy(Agent<?, ?> anAgent) {
 			return null;
 		}
 	}

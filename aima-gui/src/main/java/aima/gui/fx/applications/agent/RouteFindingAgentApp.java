@@ -1,33 +1,29 @@
 package aima.gui.fx.applications.agent;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import aima.core.agent.Agent;
-import aima.core.environment.map.ExtendableMap;
-import aima.core.environment.map.MapEnvironment;
-import aima.core.environment.map.MapFunctionFactory;
-import aima.core.environment.map.Scenario;
-import aima.core.environment.map.SimpleMapAgent;
-import aima.core.environment.map.SimplifiedRoadMapOfAustralia;
-import aima.core.environment.map.SimplifiedRoadMapOfPartOfRomania;
+import aima.core.agent.impl.DynamicPercept;
+import aima.core.environment.map.*;
+import aima.core.search.framework.Node;
 import aima.core.search.framework.SearchForActions;
-import aima.core.search.framework.evalfunc.HeuristicFunction;
-import aima.core.util.CancelableThread;
+import aima.core.util.Tasks;
 import aima.gui.fx.framework.IntegrableApplication;
 import aima.gui.fx.framework.Parameter;
-import aima.gui.fx.framework.SimulationPaneBuilder;
-import aima.gui.fx.framework.SimulationPaneCtrl;
+import aima.gui.fx.framework.TaskExecutionPaneBuilder;
+import aima.gui.fx.framework.TaskExecutionPaneCtrl;
 import aima.gui.fx.views.MapEnvironmentViewCtrl;
 import aima.gui.util.SearchFactory;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.ToDoubleFunction;
+
 /**
  * Integrable application which demonstrates how different kinds of search
- * algorithms perform an a route finding scenario.
+ * algorithms perform in a route finding scenario.
  *
  * @author Ruediger Lunde
  *
@@ -45,10 +41,10 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 	public static String PARAM_Q_SEARCH_IMPL = "qsearch";
 	public static String PARAM_HEURISTIC = "heuristic";
 
-	private SimulationPaneCtrl simPaneCtrl;
+	private TaskExecutionPaneCtrl taskPaneCtrl;
 	private MapEnvironmentViewCtrl envViewCtrl;
 	protected MapEnvironment env = null;
-	protected Agent agent = null;
+	protected Agent<DynamicPercept, MoveToAction> agent = null;
 
 	/** A scenario. */
 	protected Scenario scenario;
@@ -58,12 +54,9 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 	 */
 	protected List<String> destinations;
 	/** Search method to be used. */
-	protected SearchForActions search;
+	protected SearchForActions<String, MoveToAction> search;
 	/** Heuristic function to be used when performing informed search. */
-	protected HeuristicFunction heuristic;
-
-	public RouteFindingAgentApp() {
-	}
+	protected ToDoubleFunction<Node<String, MoveToAction>> heuristic;
 
 	@Override
 	public String getTitle() {
@@ -83,12 +76,12 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 
 		List<Parameter> params = createParameters();
 
-		SimulationPaneBuilder builder = new SimulationPaneBuilder();
+		TaskExecutionPaneBuilder builder = new TaskExecutionPaneBuilder();
 		builder.defineParameters(params);
 		builder.defineStateView(envView);
 		builder.defineInitMethod(this::initialize);
-		builder.defineSimMethod(this::simulate);
-		simPaneCtrl = builder.getResultFor(root);
+		builder.defineTaskMethod(this::startExperiment);
+		taskPaneCtrl = builder.getResultFor(root);
 
 		return root;
 	}
@@ -109,7 +102,7 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 		Parameter p3 = new Parameter(PARAM_SEARCH, (Object[]) SearchFactory.getInstance().getSearchStrategyNames());
 		p3.setDefaultValueIndex(5);
 		Parameter p4 = new Parameter(PARAM_Q_SEARCH_IMPL, (Object[]) SearchFactory.getInstance().getQSearchImplNames());
-		p4.setDefaultValueIndex(1);
+		p4.setDefaultValueIndex(2);
 		p4.setDependency(PARAM_SEARCH, "Depth First", "Breadth First", "Uniform Cost", "Greedy Best First", "A*");
 		Parameter p5 = new Parameter(PARAM_HEURISTIC, "0", "SLD");
 		p5.setDefaultValueIndex(1);
@@ -124,18 +117,18 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 		ExtendableMap map = new ExtendableMap();
 		env = new MapEnvironment(map);
 		String agentLoc = null;
-		switch (simPaneCtrl.getParamValueIndex(PARAM_SCENARIO)) {
+		switch (taskPaneCtrl.getParamValueIndex(PARAM_SCENARIO)) {
 		case 0:
-			SimplifiedRoadMapOfPartOfRomania.initMap(map);
-			agentLoc = SimplifiedRoadMapOfPartOfRomania.ARAD;
+			SimplifiedRoadMapOfRomania.initMap(map);
+			agentLoc = SimplifiedRoadMapOfRomania.ARAD;
 			break;
 		case 1:
-			SimplifiedRoadMapOfPartOfRomania.initMap(map);
-			agentLoc = SimplifiedRoadMapOfPartOfRomania.LUGOJ;
+			SimplifiedRoadMapOfRomania.initMap(map);
+			agentLoc = SimplifiedRoadMapOfRomania.LUGOJ;
 			break;
 		case 2:
-			SimplifiedRoadMapOfPartOfRomania.initMap(map);
-			agentLoc = SimplifiedRoadMapOfPartOfRomania.FAGARAS;
+			SimplifiedRoadMapOfRomania.initMap(map);
+			agentLoc = SimplifiedRoadMapOfRomania.FAGARAS;
 			break;
 		case 3:
 			SimplifiedRoadMapOfAustralia.initMap(map);
@@ -149,23 +142,23 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 		scenario = new Scenario(env, map, agentLoc);
 
 		destinations = new ArrayList<>();
-		if (simPaneCtrl.isParamVisible(PARAM_DESTINATION_R)) {
-			switch (simPaneCtrl.getParamValueIndex(PARAM_DESTINATION_R)) {
+		if (taskPaneCtrl.isParamVisible(PARAM_DESTINATION_R)) {
+			switch (taskPaneCtrl.getParamValueIndex(PARAM_DESTINATION_R)) {
 			case 0:
-				destinations.add(SimplifiedRoadMapOfPartOfRomania.BUCHAREST);
+				destinations.add(SimplifiedRoadMapOfRomania.BUCHAREST);
 				break;
 			case 1:
-				destinations.add(SimplifiedRoadMapOfPartOfRomania.EFORIE);
+				destinations.add(SimplifiedRoadMapOfRomania.EFORIE);
 				break;
 			case 2:
-				destinations.add(SimplifiedRoadMapOfPartOfRomania.NEAMT);
+				destinations.add(SimplifiedRoadMapOfRomania.NEAMT);
 				break;
 			case 3:
 				destinations.add(map.randomlyGenerateDestination());
 				break;
 			}
-		} else if (simPaneCtrl.isParamVisible(PARAM_DESTINATION_A)) {
-			switch (simPaneCtrl.getParamValueIndex(PARAM_DESTINATION_A)) {
+		} else if (taskPaneCtrl.isParamVisible(PARAM_DESTINATION_A)) {
+			switch (taskPaneCtrl.getParamValueIndex(PARAM_DESTINATION_A)) {
 			case 0:
 				destinations.add(SimplifiedRoadMapOfAustralia.PORT_HEDLAND);
 				break;
@@ -181,37 +174,37 @@ public class RouteFindingAgentApp extends IntegrableApplication {
 			}
 		}
 
-		switch (simPaneCtrl.getParamValueIndex(PARAM_HEURISTIC)) {
+		switch (taskPaneCtrl.getParamValueIndex(PARAM_HEURISTIC)) {
 		case 0:
-			heuristic = MapFunctionFactory.getZeroHeuristicFunction();
+			heuristic = (node) -> 0.0;
 			break;
 		default:
-			heuristic = MapFunctionFactory.getSLDHeuristicFunction(destinations.get(0), scenario.getAgentMap());
+			heuristic = MapFunctions.createSLDHeuristicFunction(destinations.get(0), scenario.getAgentMap());
 		}
 
-		search = SearchFactory.getInstance().createSearch(simPaneCtrl.getParamValueIndex(PARAM_SEARCH),
-				simPaneCtrl.getParamValueIndex(PARAM_Q_SEARCH_IMPL), heuristic);
+		search = SearchFactory.getInstance().createSearch(taskPaneCtrl.getParamValueIndex(PARAM_SEARCH),
+				taskPaneCtrl.getParamValueIndex(PARAM_Q_SEARCH_IMPL), heuristic);
 
 		String goal = destinations.get(0);
-		agent = new SimpleMapAgent(env.getMap(), search, new String[] { goal });
+		agent = new SimpleMapAgent(env.getMap(), search, goal);
 		env.addAgent(agent, scenario.getInitAgentLocation());
-		env.addEnvironmentView(envViewCtrl);
+		env.addEnvironmentListener(envViewCtrl);
 		envViewCtrl.setGoal(goal);
 		envViewCtrl.initialize(env);
 	}
 
 	/** Starts the experiment. */
-	public void simulate() {
-		while (!env.isDone() && !CancelableThread.currIsCanceled()) {
+	public void startExperiment() {
+		while (!env.isDone() && !Tasks.currIsCancelled()) {
 			env.step();
-			simPaneCtrl.waitAfterStep();
+			taskPaneCtrl.waitAfterStep();
 		}
-		simPaneCtrl.setStatus(search.getMetrics().toString());
+		taskPaneCtrl.setStatus(search.getMetrics().toString());
 		envViewCtrl.notify("pathCost=" + search.getMetrics().get("pathCost"));
 	}
 
 	@Override
 	public void cleanup() {
-		simPaneCtrl.cancelSimulation();
+		taskPaneCtrl.cancelExecution();
 	}
 }

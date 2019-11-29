@@ -1,18 +1,17 @@
 package aima.gui.swing.applications.agent;
 
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.List;
-
 import aima.core.agent.Action;
 import aima.core.agent.Agent;
 import aima.core.agent.Environment;
 import aima.core.agent.impl.DynamicAction;
 import aima.core.environment.vacuum.VacuumEnvironment;
+import aima.core.environment.vacuum.VacuumPercept;
 import aima.gui.swing.framework.EmptyEnvironmentView;
+
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.List;
 
 /**
  * Displays the informations provided by a <code>VacuumEnvironment</code> on a
@@ -20,19 +19,19 @@ import aima.gui.swing.framework.EmptyEnvironmentView;
  * 
  * @author Ruediger Lunde
  */
-public class VacuumView extends EmptyEnvironmentView {
+public class VacuumView extends EmptyEnvironmentView<VacuumPercept, Action> {
 
 	private static final long serialVersionUID = 1L;
-	private Hashtable<Agent, Action> lastActions = new Hashtable<Agent, Action>();
+	private Hashtable<Agent, Action> lastActions = new Hashtable<>();
 
 	@Override
-	public void agentActed(Agent agent, Action action, Environment source) {
+	public void agentActed(Agent<?, ?> agent, VacuumPercept percept, Action action, Environment<?, ?> source) {
 		lastActions.put(agent, action);
 		String prefix = "";
 		if (env.getAgents().size() > 1)
 			prefix = "A" + env.getAgents().indexOf(agent) + ": ";
 		notify(prefix + action.toString());
-		super.agentActed(agent, action, source);
+		super.agentActed(agent, percept, action, source);
 	}
 
 	protected VacuumEnvironment getVacuumEnv() {

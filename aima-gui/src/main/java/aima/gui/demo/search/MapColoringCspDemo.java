@@ -1,13 +1,9 @@
 package aima.gui.demo.search;
 
-import aima.core.search.csp.Assignment;
-import aima.core.search.csp.BacktrackingStrategy;
-import aima.core.search.csp.CSP;
-import aima.core.search.csp.CSPStateListener;
-import aima.core.search.csp.ImprovedBacktrackingStrategy;
-import aima.core.search.csp.MinConflictsStrategy;
-import aima.core.search.csp.SolutionStrategy;
+import aima.core.search.csp.*;
 import aima.core.search.csp.examples.MapCSP;
+
+import java.util.Optional;
 
 /**
  * Demonstrates the performance of different constraint solving strategies.
@@ -18,58 +14,41 @@ import aima.core.search.csp.examples.MapCSP;
 
 public class MapColoringCspDemo {
 	public static void main(String[] args) {
-		CSP csp = new MapCSP();
-		StepCounter stepCounter = new StepCounter();
-		SolutionStrategy solver;
+		CSP<Variable, String> csp = new MapCSP();
+		CspListener.StepCounter<Variable, String> stepCounter = new CspListener.StepCounter<>();
+		CspSolver<Variable, String> solver;
+		Optional<Assignment<Variable, String>> solution;
 		
-		solver = new MinConflictsStrategy(1000);
-		solver.addCSPStateListener(stepCounter);
+		solver = new MinConflictsSolver<>(1000);
+		solver.addCspListener(stepCounter);
 		stepCounter.reset();
 		System.out.println("Map Coloring (Minimum Conflicts)");
-		System.out.println(solver.solve(csp.copyDomains()));
+		solution = solver.solve(csp);
+		solution.ifPresent(System.out::println);
 		System.out.println(stepCounter.getResults() + "\n");
 		
-		solver = new ImprovedBacktrackingStrategy(true, true, true, true);
-		solver.addCSPStateListener(stepCounter);
+		solver = new FlexibleBacktrackingSolver<Variable, String>().setAll();
+		solver.addCspListener(stepCounter);
 		stepCounter.reset();
-		System.out.println("Map Coloring (Backtracking + MRV + DEG + AC3 + LCV)");
-		System.out.println(solver.solve(csp.copyDomains()));
+		System.out.println("Map Coloring (Backtracking + MRV & DEG + LCV + AC3)");
+		solution = solver.solve(csp);
+		solution.ifPresent(System.out::println);
+		System.out.println(stepCounter.getResults() + "\n");
+
+		solver = new FlexibleBacktrackingSolver<Variable, String>().set(CspHeuristics.mrvDeg());
+		solver.addCspListener(stepCounter);
+		stepCounter.reset();
+		System.out.println("Map Coloring (Backtracking + MRV & DEG)");
+		solution = solver.solve(csp);
+		solution.ifPresent(System.out::println);
 		System.out.println(stepCounter.getResults() + "\n");
 		
-		solver = new BacktrackingStrategy();
-		solver.addCSPStateListener(stepCounter);
+		solver = new FlexibleBacktrackingSolver<>();
+		solver.addCspListener(stepCounter);
 		stepCounter.reset();
 		System.out.println("Map Coloring (Backtracking)");
-		System.out.println(solver.solve(csp.copyDomains()));
+		solution = solver.solve(csp);
+		solution.ifPresent(System.out::println);
 		System.out.println(stepCounter.getResults() + "\n");
-	}
-	
-	/** Counts assignment and domain changes during CSP solving. */
-	protected static class StepCounter implements CSPStateListener {
-		private int assignmentCount = 0;
-		private int domainCount = 0;
-		
-		@Override
-		public void stateChanged(Assignment assignment, CSP csp) {
-			++assignmentCount;
-		}
-		
-		@Override
-		public void stateChanged(CSP csp) {
-			++domainCount;
-		}
-		
-		public void reset() {
-			assignmentCount = 0;
-			domainCount = 0;
-		}
-		
-		public String getResults() {
-			StringBuffer result = new StringBuffer();
-			result.append("assignment changes: " + assignmentCount);
-			if (domainCount != 0)
-				result.append(", domain changes: " + domainCount);
-			return result.toString();
-		}
 	}
 }

@@ -2,6 +2,7 @@ package aima.core.learning.reinforcement.agent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import aima.core.agent.Action;
 import aima.core.learning.reinforcement.PerceptStateReward;
@@ -62,23 +63,22 @@ import aima.core.util.datastructure.Pair;
  * 
  * @author Ciaran O'Reilly
  * @author Ravi Mohan
+ * @author Ruediger Lunde
  * 
  */
-public class QLearningAgent<S, A extends Action> extends
-		ReinforcementAgent<S, A> {
+public class QLearningAgent<S, A extends Action> extends ReinforcementAgent<S, A> {
 	// persistent: Q, a table of action values indexed by state and action,
 	// initially zero
-	Map<Pair<S, A>, Double> Q = new HashMap<Pair<S, A>, Double>();
+	private Map<Pair<S, A>, Double> Q = new HashMap<>();
 	// N<sub>sa</sub>, a table of frequencies for state-action pairs, initially
 	// zero
-	private FrequencyCounter<Pair<S, A>> Nsa = new FrequencyCounter<Pair<S, A>>();
+	private FrequencyCounter<Pair<S, A>> Nsa = new FrequencyCounter<>();
 	// s,a,r, the previous state, action, and reward, initially null
 	private S s = null;
 	private A a = null;
 	private Double r = null;
 	//
-	private ActionsFunction<S, A> actionsFunction = null;
-	private A noneAction = null;
+	private ActionsFunction<S, A> actionsFunction;
 	private double alpha = 0.0;
 	private double gamma = 0.0;
 	private int Ne = 0;
@@ -89,8 +89,6 @@ public class QLearningAgent<S, A extends Action> extends
 	 * 
 	 * @param actionsFunction
 	 *            a function that lists the legal actions from a state.
-	 * @param noneAction
-	 *            an action representing None, i.e. a NoOp.
 	 * @param alpha
 	 *            a fixed learning rate.
 	 * @param gamma
@@ -101,11 +99,8 @@ public class QLearningAgent<S, A extends Action> extends
 	 *            R+ is an optimistic estimate of the best possible reward
 	 *            obtainable in any state, which is used in the method f(u, n).
 	 */
-	public QLearningAgent(ActionsFunction<S, A> actionsFunction,
-			A noneAction, double alpha,
-			double gamma, int Ne, double Rplus) {
+	public QLearningAgent(ActionsFunction<S, A> actionsFunction, double alpha, double gamma, int Ne, double Rplus) {
 		this.actionsFunction = actionsFunction;
-		this.noneAction = noneAction;
 		this.alpha = alpha;
 		this.gamma = gamma;
 		this.Ne = Ne;
@@ -125,20 +120,20 @@ public class QLearningAgent<S, A extends Action> extends
 	 * @return an action
 	 */
 	@Override
-	public A execute(PerceptStateReward<S> percept) {
+	public Optional<A> act(PerceptStateReward<S> percept) {
 
 		S sPrime = percept.state();
 		double rPrime = percept.reward();
 
 		// if TERMAINAL?(s') then Q[s',None] <- r'
 		if (isTerminal(sPrime)) {
-			Q.put(new Pair<S, A>(sPrime, noneAction), rPrime);
+			Q.put(new Pair<>(sPrime, null), rPrime);
 		}
 
 		// if s is not null then
 		if (null != s) {
 			// increment N<sub>sa</sub>[s,a]
-			Pair<S, A> sa = new Pair<S, A>(s, a);
+			Pair<S, A> sa = new Pair<>(s, a);
 			Nsa.incrementFor(sa);
 			// Q[s,a] <- Q[s,a] + &alpha;(N<sub>sa</sub>[s,a])(r +
 			// &gamma;max<sub>a'</sub>Q[s',a'] - Q[s,a])
@@ -162,7 +157,7 @@ public class QLearningAgent<S, A extends Action> extends
 		}
 
 		// return a
-		return a;
+		return Optional.ofNullable(a);
 	}
 
 	@Override
@@ -179,7 +174,7 @@ public class QLearningAgent<S, A extends Action> extends
 		// Q-values are directly related to utility values as follows
 		// (AIMA3e pg. 843 - 21.6) :
 		// U(s) = max<sub>a</sub>Q(s,a).
-		Map<S, Double> U = new HashMap<S, Double>();
+		Map<S, Double> U = new HashMap<>();
 		for (Pair<S, A> sa : Q.keySet()) {
 			Double q = Q.get(sa);
 			Double u = U.get(sa.getFirst());
@@ -257,10 +252,10 @@ public class QLearningAgent<S, A extends Action> extends
 		double max = Double.NEGATIVE_INFINITY;
 		if (actionsFunction.actions(sPrime).size() == 0) {
 			// a terminal state
-			max = Q.get(new Pair<S, A>(sPrime, noneAction));
+			max = Q.get(new Pair<>(sPrime, null));
 		} else {
 			for (A aPrime : actionsFunction.actions(sPrime)) {
-				Double Q_sPrimeAPrime = Q.get(new Pair<S, A>(sPrime, aPrime));
+				Double Q_sPrimeAPrime = Q.get(new Pair<>(sPrime, aPrime));
 				if (null != Q_sPrimeAPrime && Q_sPrimeAPrime > max) {
 					max = Q_sPrimeAPrime;
 				}
@@ -278,7 +273,7 @@ public class QLearningAgent<S, A extends Action> extends
 		A a = null;
 		double max = Double.NEGATIVE_INFINITY;
 		for (A aPrime : actionsFunction.actions(sPrime)) {
-			Pair<S, A> sPrimeAPrime = new Pair<S, A>(sPrime, aPrime);
+			Pair<S, A> sPrimeAPrime = new Pair<>(sPrime, aPrime);
 			double explorationValue = f(Q.get(sPrimeAPrime), Nsa
 					.getCount(sPrimeAPrime));
 			if (explorationValue > max) {

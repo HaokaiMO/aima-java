@@ -14,6 +14,7 @@ import aima.core.agent.impl.aprog.simplerule.Rule;
 
 /**
  * @author Ciaran O'Reilly
+ * @author Ruediger Lunde
  * 
  */
 public class RuleTest {
@@ -29,50 +30,50 @@ public class RuleTest {
 
 	@Test
 	public void testEQUALRule() {
-		Rule r = new Rule(new EQUALCondition(ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING,
+		Rule<Action> r = new Rule<>(new EQUALCondition(ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING,
 				true), ACTION_INITIATE_BRAKING);
 
 		Assert.assertEquals(ACTION_INITIATE_BRAKING, r.getAction());
 
 		Assert.assertEquals(
-				"if car-in-front-is-braking==true then Action[name==initiate-braking].",
+				"if car-in-front-is-braking==true then Action[name=initiate-braking].",
 				r.toString());
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true)));
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, false)));
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_INDICATING, true)));
 	}
 
 	@Test
 	public void testNOTRule() {
-		Rule r = new Rule(new NOTCondition(new EQUALCondition(
+		Rule<Action> r = new Rule<>(new NOTCondition(new EQUALCondition(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true)),
 				ACTION_INITIATE_BRAKING);
 
 		Assert.assertEquals(ACTION_INITIATE_BRAKING, r.getAction());
 
 		Assert.assertEquals(
-				"if ![car-in-front-is-braking==true] then Action[name==initiate-braking].",
+				"if ![car-in-front-is-braking==true] then Action[name=initiate-braking].",
 				r.toString());
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, false)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_INDICATING, true)));
 	}
 
 	@Test
 	public void testANDRule() {
-		Rule r = new Rule(new ANDCondition(new EQUALCondition(
+		Rule<Action> r = new Rule<>(new ANDCondition(new EQUALCondition(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true), new EQUALCondition(
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)),
 				ACTION_EMERGENCY_BRAKING);
@@ -80,31 +81,31 @@ public class RuleTest {
 		Assert.assertEquals(ACTION_EMERGENCY_BRAKING, r.getAction());
 
 		Assert.assertEquals(
-				"if [car-in-front-is-braking==true && car-in-front-tires-smoking==true] then Action[name==emergency-braking].",
+				"if [car-in-front-is-braking==true && car-in-front-tires-smoking==true] then Action[name=emergency-braking].",
 				r.toString());
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true)));
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)));
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, false,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)));
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, false)));
 	}
 
 	@Test
 	public void testORRule() {
-		Rule r = new Rule(new ORCondition(new EQUALCondition(
+		Rule<Action> r = new Rule<>(new ORCondition(new EQUALCondition(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true), new EQUALCondition(
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)),
 				ACTION_EMERGENCY_BRAKING);
@@ -112,28 +113,28 @@ public class RuleTest {
 		Assert.assertEquals(ACTION_EMERGENCY_BRAKING, r.getAction());
 
 		Assert.assertEquals(
-				"if [car-in-front-is-braking==true || car-in-front-tires-smoking==true] then Action[name==emergency-braking].",
+				"if [car-in-front-is-braking==true || car-in-front-tires-smoking==true] then Action[name=emergency-braking].",
 				r.toString());
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, false,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, true)));
 
-		Assert.assertEquals(true, r.evaluate(new DynamicPercept(
+		Assert.assertTrue(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, true,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, false)));
 
-		Assert.assertEquals(false, r.evaluate(new DynamicPercept(
+		Assert.assertFalse(r.evaluate(new DynamicPercept(
 				ATTRIBUTE_CAR_IN_FRONT_IS_BRAKING, false,
 				ATTRIBUTE_CAR_IN_FRONT_TIRES_SMOKING, false)));
 	}

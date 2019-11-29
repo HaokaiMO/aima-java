@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Predicate;
 
-import aima.core.search.framework.problem.GoalTest;
 import aima.core.search.local.FitnessFunction;
 import aima.core.search.local.Individual;
 import aima.core.util.datastructure.XYLocation;
@@ -27,22 +27,21 @@ public class NQueensGenAlgoUtil {
 		return new NQueensFitnessFunction();
 	}
 	
-	public static GoalTest getGoalTest() {
+	public static Predicate<Individual<Integer>> getGoalTest() {
 		return new NQueensGenAlgoGoalTest();
 	}
 	
 
 	public static Individual<Integer> generateRandomIndividual(int boardSize) {
-		List<Integer> individualRepresentation = new ArrayList<Integer>();
+		List<Integer> individualRepresentation = new ArrayList<>();
 		for (int i = 0; i < boardSize; i++) {
 			individualRepresentation.add(new Random().nextInt(boardSize));
 		}
-		Individual<Integer> individual = new Individual<Integer>(individualRepresentation);
-		return individual;
+		return new Individual<>(individualRepresentation);
 	}
 
 	public static Collection<Integer> getFiniteAlphabetForBoardOfSize(int size) {
-		Collection<Integer> fab = new ArrayList<Integer>();
+		Collection<Integer> fab = new ArrayList<>();
 
 		for (int i = 0; i < size; i++) {
 			fab.add(i);
@@ -65,7 +64,7 @@ public class NQueensGenAlgoUtil {
 			List<XYLocation> qPositions = board.getQueenPositions();
 			for (int fromX = 0; fromX < (boardSize - 1); fromX++) {
 				for (int toX = fromX + 1; toX < boardSize; toX++) {
-					int fromY = qPositions.get(fromX).getYCoOrdinate();
+					int fromY = qPositions.get(fromX).getY();
 					boolean nonAttackingPair = true;
 					// Check right beside
 					int toY = fromY;
@@ -97,12 +96,12 @@ public class NQueensGenAlgoUtil {
 		}
 	}
 
-	public static class NQueensGenAlgoGoalTest implements GoalTest {
-		private final NQueensGoalTest goalTest = new NQueensGoalTest();
+	public static class NQueensGenAlgoGoalTest implements Predicate<Individual<Integer>> {
+		private final Predicate<NQueensBoard> goalTest = NQueensFunctions::testGoal;
 
-		@SuppressWarnings("unchecked")
-		public boolean isGoalState(Object state) {
-			return goalTest.isGoalState(getBoardForIndividual((Individual<Integer>) state));
+		@Override
+		public boolean test(Individual<Integer> state) {
+			return goalTest.test(getBoardForIndividual(state));
 		}
 	}
 
@@ -113,7 +112,6 @@ public class NQueensGenAlgoUtil {
 			int pos = individual.getRepresentation().get(i);
 			board.addQueenAt(new XYLocation(i, pos));
 		}
-
 		return board;
 	}
 }

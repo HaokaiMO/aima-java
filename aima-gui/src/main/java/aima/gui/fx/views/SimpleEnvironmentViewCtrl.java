@@ -1,9 +1,7 @@
 package aima.gui.fx.views;
 
-import aima.core.agent.Action;
-import aima.core.agent.Agent;
-import aima.core.agent.Environment;
-import aima.core.agent.EnvironmentView;
+import aima.core.agent.*;
+import aima.core.agent.impl.AbstractEnvironment;
 import javafx.application.Platform;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
@@ -17,11 +15,13 @@ import java.util.Observable;
  * environment changes on a text area and can be used for any kind of
  * environment. More specific environment views can be created on this base by
  * adding state visualization to the split pane of this implementation.
- * 
+ *
+ * @param <P> Typ used for percepts
+ * @param <A> Typ used for actions
  * @author Ruediger Lunde
  *
  */
-public class SimpleEnvironmentViewCtrl extends Observable implements EnvironmentView {
+public class SimpleEnvironmentViewCtrl<P, A> extends Observable implements EnvironmentListener<P, A> {
 
 	protected SplitPane splitPane;
 	protected TextArea textArea;
@@ -45,9 +45,9 @@ public class SimpleEnvironmentViewCtrl extends Observable implements Environment
 		splitPane.setDividerPosition(0, dividerPos);
 	}
 
-	public void initialize(Environment env) {
+	public void initialize(AbstractEnvironment<? extends P, ? extends A> env) {
 		if (!textArea.getText().isEmpty())
-			textArea.appendText("\n");
+			textArea.appendText("\n\n");
 		updateEnvStateView(env);
 	}
 	
@@ -57,38 +57,49 @@ public class SimpleEnvironmentViewCtrl extends Observable implements Environment
 	@Override
 	public void notify(String msg) {
 		if (Platform.isFxApplicationThread())
-			textArea.appendText("\n" + msg);
+			textArea.appendText("\n" + msg + "\n");
 		else
-			Platform.runLater(() -> textArea.appendText("\n" + msg));
+			Platform.runLater(() -> textArea.appendText("\n" + msg+ "\n"));
 	}
 
 	/**
-	 * Should not be called from an FX application thread.
+	 * Can be called from every thread.
 	 */
 	@Override
-	public void agentAdded(Agent agent, Environment source) {
-		Platform.runLater(() -> {
-			textArea.appendText("\nAgent added.");
+	public void agentAdded(Agent<?, ?> agent, Environment<?, ?> source) {
+		Runnable r = () -> {
+			int agentId = source.getAgents().indexOf(agent) + 1;
+			textArea.appendText("\nAgent " + agentId + " added.");
 			updateEnvStateView(source);
-		});
-
+		};
+		if (Platform.isFxApplicationThread())
+			r.run();
+		else
+			Platform.runLater(r);
 	}
 
 	/**
-	 * Should not be called from an FX application thread.
+	 * Can be called from every thread.
 	 */
 	@Override
-	public void agentActed(Agent agent, Action action, Environment source) {
-		Platform.runLater(() -> {
-			textArea.appendText("\nAgent acted: " + action.toString());
+	public void agentActed(Agent<?, ?> agent, P percept, A action, Environment<?, ?> source) {
+		Runnable r = () -> {
+			int agentId = source.getAgents().indexOf(agent) + 1;
+			textArea.appendText("\nAgent " + agentId + " acted.");
+			textArea.appendText("\n   Percept: " + percept.toString());
+			textArea.appendText("\n   Action: " + action.toString());
 			updateEnvStateView(source);
-		});
+		};
+		if (Platform.isFxApplicationThread())
+			r.run();
+		else
+			Platform.runLater(r);
 	}
 
 	/**
 	 * Is called after agent actions. This implementation just notifies all observers.
 	 */
-	protected void updateEnvStateView(Environment env) {
-		this.notifyObservers();
+	protected void updateEnvStateView(Environment<?, ?> env) {
+		notifyObservers();
 	}
 }

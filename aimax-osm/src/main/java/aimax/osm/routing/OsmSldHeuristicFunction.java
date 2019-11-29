@@ -1,15 +1,17 @@
 package aimax.osm.routing;
 
-import aima.core.search.framework.evalfunc.HeuristicFunction;
+import aima.core.search.framework.Node;
 import aimax.osm.data.Position;
 import aimax.osm.data.entities.MapNode;
+
+import java.util.function.ToDoubleFunction;
 
 /**
  * Implements the straight-line-distance heuristic.
  * @author Ruediger Lunde
  */
-public class OsmSldHeuristicFunction implements HeuristicFunction {
-	MapNode goalState;
+public class OsmSldHeuristicFunction implements ToDoubleFunction<Node<MapNode, OsmMoveAction>> {
+	private MapNode goalState;
 	
 	public OsmSldHeuristicFunction(MapNode goalState) {
 		this.goalState = goalState;
@@ -20,8 +22,7 @@ public class OsmSldHeuristicFunction implements HeuristicFunction {
 	 * straight-line-distance to the goal in KM.
 	 */
 	@Override
-	public double h(Object s) {
-		MapNode currState = (MapNode) s;
-		return (new Position(currState)).getDistKM(goalState);
+	public double applyAsDouble(Node<MapNode, OsmMoveAction> node) {
+		return (new Position(node.getState())).getDistKM(goalState);
 	}
 }

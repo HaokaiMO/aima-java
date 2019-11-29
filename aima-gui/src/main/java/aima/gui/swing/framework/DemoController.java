@@ -3,10 +3,12 @@ package aima.gui.swing.framework;
 /**
  * Simple controller implementation which shows the relationship between buttons
  * and selector activations and controller method calls.
- * 
+ *
+ * @param <P> Type which is used to represent percepts
+ * @param <A> Type which is used to represent actions
  * @author Ruediger Lunde
  */
-public class DemoController extends AgentAppController {
+public class DemoController<P, A> extends AgentAppController<P, A> {
 	/** The controller decides when simulation can be started. */
 	private boolean isPrepared = false;
 
@@ -93,7 +95,7 @@ public class DemoController extends AgentAppController {
 	 *            The thread which was used to run the agent.
 	 */
 	public void update(SimulationThread agentThread) {
-		if (agentThread.isCanceled()) {
+		if (agentThread.isCancelled()) {
 			frame.setStatus("Task canceled.");
 			isPrepared = false;
 		} else if (frame.simulationPaused()) {

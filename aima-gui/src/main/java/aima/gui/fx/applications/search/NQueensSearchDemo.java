@@ -1,28 +1,19 @@
 package aima.gui.fx.applications.search;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Random;
-
-import aima.core.agent.Action;
-import aima.core.environment.nqueens.AttackingPairsHeuristic;
 import aima.core.environment.nqueens.NQueensBoard;
 import aima.core.environment.nqueens.NQueensBoard.Config;
-import aima.core.environment.nqueens.NQueensFunctionFactory;
+import aima.core.environment.nqueens.NQueensFunctions;
 import aima.core.environment.nqueens.NQueensGenAlgoUtil;
-import aima.core.environment.nqueens.NQueensGoalTest;
+import aima.core.environment.nqueens.QueenAction;
 import aima.core.search.framework.Metrics;
 import aima.core.search.framework.SearchForActions;
+import aima.core.search.framework.problem.GeneralProblem;
 import aima.core.search.framework.problem.Problem;
 import aima.core.search.framework.qsearch.TreeSearch;
-import aima.core.search.local.FitnessFunction;
-import aima.core.search.local.GeneticAlgorithm;
-import aima.core.search.local.HillClimbingSearch;
-import aima.core.search.local.Individual;
-import aima.core.search.local.Scheduler;
-import aima.core.search.local.SimulatedAnnealingSearch;
+import aima.core.search.local.*;
 import aima.core.search.uninformed.DepthFirstSearch;
+
+import java.util.*;
 
 /**
  * Command line demo which demonstrates how different search algorithms
@@ -32,26 +23,26 @@ import aima.core.search.uninformed.DepthFirstSearch;
  */
 public class NQueensSearchDemo {
 	private int boardSize = 8;
-	public int populationSize = 10;
-	public double mutationProbability = 0.2;
+	private int populationSize = 10;
+	private double mutationProbability = 0.2;
 	public int k = 30;
-	public double lambda = 2.0 / 100;
-	public int maxIterations = 500;
+	private double lambda = 2.0 / 100;
+	private int maxIterations = 500;
 
 	private static Random random = new Random();
 	private GeneticAlgorithm<Integer> genAlgo;
-	private SearchForActions search;
+	private SearchForActions<NQueensBoard, QueenAction> search;
 	private NQueensBoard board;
-	private List<ProgressTracer> progressTracers = new ArrayList<>();
+	private List<ProgressTracker> progressTracers = new ArrayList<>();
 
 	public static void main(String[] args) {
 		NQueensSearchDemo demo = new NQueensSearchDemo();
 		// prog.setBoardSize(32);
-		demo.addProgressTracer(demo::printProgress);
+		demo.addProgressTracker(demo::printProgress);
 
 		System.out.println("NQueens depth-first search experiment (boardSize=" + demo.boardSize + ") -->");
 		demo.initExperiment(Config.EMPTY);
-		demo.startExperiment(new DepthFirstSearch(new TreeSearch()));
+		demo.startExperiment(new DepthFirstSearch<>(new TreeSearch<>()));
 		demo.printResult();
 
 		System.out.println("NQueens hill climbing search experiment (boardSize=" + demo.boardSize + ") -->");
@@ -77,7 +68,7 @@ public class NQueensSearchDemo {
 		board = new NQueensBoard(boardSize);
 	}
 
-	public void addProgressTracer(ProgressTracer tracer) {
+	public void addProgressTracker(ProgressTracker tracer) {
 		progressTracers.add(tracer);
 	}
 
@@ -87,49 +78,47 @@ public class NQueensSearchDemo {
 		search = null;
 	}
 
-	public void startExperiment(SearchForActions search) {
+	public void startExperiment(SearchForActions<NQueensBoard, QueenAction> search) {
 
-		search.getNodeExpander()
-				.addNodeListener(n -> notifyProgressTracers((NQueensBoard) n.getState(), search.getMetrics()));
+		search.addNodeListener(n -> notifyProgressTrackers(n.getState(), search.getMetrics()));
 
-		Problem problem = null;
+		Problem<NQueensBoard, QueenAction> problem;
 		if (board.getNumberOfQueensOnBoard() == 0)
-			problem = new Problem(board, NQueensFunctionFactory.getIActionsFunction(),
-					NQueensFunctionFactory.getResultFunction(), new NQueensGoalTest());
+			problem = new GeneralProblem<>(board, NQueensFunctions::getIFActions,
+					NQueensFunctions::getResult, NQueensFunctions::testGoal);
 		else
-			problem = new Problem(board, NQueensFunctionFactory.getCActionsFunction(),
-					NQueensFunctionFactory.getResultFunction(), new NQueensGoalTest());
-		List<Action> actions = search.findActions(problem);
-		for (Action action : actions)
-			board = (NQueensBoard) NQueensFunctionFactory.getResultFunction().result(board, action);
+			problem = new GeneralProblem<>(board, NQueensFunctions::getCSFActions,
+					NQueensFunctions::getResult, NQueensFunctions::testGoal);
+		Optional<List<QueenAction>> actions = search.findActions(problem);
+		if (actions.isPresent())
+			for (QueenAction action : actions.get())
+				board = NQueensFunctions.getResult(board, action);
 
-		notifyProgressTracers(board, search.getMetrics());
+		notifyProgressTrackers(board, search.getMetrics());
 	}
 
 	public void startHillClimbingExperiment() {
 		// board = new NQueensBoard(boardSize, Config.QUEEN_IN_EVERY_COL);
-		Problem problem = new Problem(board, NQueensFunctionFactory.getCActionsFunction(),
-				NQueensFunctionFactory.getResultFunction(), new NQueensGoalTest());
-		search = new HillClimbingSearch(new AttackingPairsHeuristic());
-		search.getNodeExpander()
-				.addNodeListener(n -> notifyProgressTracers((NQueensBoard) n.getState(), search.getMetrics()));
+		Problem<NQueensBoard, QueenAction> problem = new GeneralProblem<>(board, NQueensFunctions::getCSFActions,
+				NQueensFunctions::getResult, NQueensFunctions::testGoal);
+		search = new HillClimbingSearch<>(n -> -NQueensFunctions.getNumberOfAttackingPairs(n));
+		search.addNodeListener(n -> notifyProgressTrackers(n.getState(), search.getMetrics()));
 		search.findActions(problem);
 
-		board = (NQueensBoard) ((HillClimbingSearch) search).getLastSearchState();
-		notifyProgressTracers(board, search.getMetrics());
+		board = (NQueensBoard) ((HillClimbingSearch) search).getLastState();
+		notifyProgressTrackers(board, search.getMetrics());
 	}
 
 	public void startSimulatedAnnealingExperiment() {
-		Problem problem = new Problem(board, NQueensFunctionFactory.getCActionsFunction(),
-				NQueensFunctionFactory.getResultFunction(), new NQueensGoalTest());
+		Problem<NQueensBoard, QueenAction> problem = new GeneralProblem<>(board, NQueensFunctions::getCSFActions,
+				NQueensFunctions::getResult, NQueensFunctions::testGoal);
 		Scheduler scheduler = new Scheduler(k, lambda, maxIterations);
-		search = new SimulatedAnnealingSearch(new AttackingPairsHeuristic(), scheduler);
-		search.getNodeExpander()
-				.addNodeListener(n -> notifyProgressTracers((NQueensBoard) n.getState(), search.getMetrics()));
+		search = new SimulatedAnnealingSearch<>(NQueensFunctions::getNumberOfAttackingPairs, scheduler);
+		search.addNodeListener(n -> notifyProgressTrackers(n.getState(), search.getMetrics()));
 		search.findActions(problem);
 
-		board = (NQueensBoard) ((SimulatedAnnealingSearch) search).getLastSearchState();
-		notifyProgressTracers(board, search.getMetrics());
+		board = (NQueensBoard) ((SimulatedAnnealingSearch) search).getLastState();
+		notifyProgressTrackers(board, search.getMetrics());
 	}
 
 	public void startGenAlgoExperiment(boolean randomConfig) {
@@ -151,17 +140,17 @@ public class NQueensSearchDemo {
 				metrics.set("fitAvg", avg);
 			}
 		};
-		genAlgo.addProgressTracer((it, pop) -> notifyProgressTracers(pop, fitnessFn));
+		genAlgo.addProgressTracer((it, pop) -> notifyProgressTrackers(pop, fitnessFn));
 
 		List<Individual<Integer>> population = new ArrayList<>();
-		List<Integer> rep = new ArrayList<Integer>();
+		List<Integer> rep = new ArrayList<>();
 		for (int i = 0; i < boardSize; i++)
 			rep.add(0);
 		for (int i = 0; i < populationSize; i++)
 			if (randomConfig)
 				population.add(NQueensGenAlgoUtil.generateRandomIndividual(boardSize));
 			else
-				population.add(new Individual<Integer>(rep));
+				population.add(new Individual<>(rep));
 
 		Individual<Integer> result = genAlgo.geneticAlgorithm(population, fitnessFn, maxIterations);
 
@@ -188,17 +177,17 @@ public class NQueensSearchDemo {
 		System.out.println("Experiment finished.\n");
 	}
 
-	private void notifyProgressTracers(Collection<Individual<Integer>> population, FitnessFunction<Integer> fitnessFn) {
+	private void notifyProgressTrackers(Collection<Individual<Integer>> population, FitnessFunction<Integer> fitnessFn) {
 		Individual<Integer> best = genAlgo.retrieveBestIndividual(population, fitnessFn);
-		notifyProgressTracers(NQueensGenAlgoUtil.getBoardForIndividual(best), genAlgo.getMetrics());
+		notifyProgressTrackers(NQueensGenAlgoUtil.getBoardForIndividual(best), genAlgo.getMetrics());
 	}
 
-	private void notifyProgressTracers(NQueensBoard board, Metrics metrics) {
-		for (ProgressTracer tracer : progressTracers)
-			tracer.traceProgress(board, metrics);
+	private void notifyProgressTrackers(NQueensBoard board, Metrics metrics) {
+		for (ProgressTracker tracker : progressTracers)
+			tracker.trackProgress(board, metrics);
 	}
 
-	public interface ProgressTracer {
-		void traceProgress(NQueensBoard board, Metrics metrics);
+	public interface ProgressTracker {
+		void trackProgress(NQueensBoard board, Metrics metrics);
 	}
 }

@@ -1,117 +1,85 @@
 package aima.core.search.csp;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Hashtable;
-import java.util.List;
+import java.util.*;
 
 /**
  * An assignment assigns values to some or all variables of a CSP.
- * 
+ *
  * @author Ruediger Lunde
  */
-public class Assignment {
-	/**
-	 * Contains all assigned variables. Positions reflect the the order in which
-	 * the variables were assigned to values.
-	 */
-	List<Variable> variables;
-	/** Maps variables to their assigned values. */
-	Hashtable<Variable, Object> variableToValue;
+public class Assignment<VAR extends Variable, VAL> implements Cloneable {
+    /**
+     * Maps variables to their assigned values.
+     */
+    private LinkedHashMap<VAR, VAL> variableToValueMap = new LinkedHashMap<>();
 
-	public Assignment() {
-		variables = new ArrayList<Variable>();
-		variableToValue = new Hashtable<Variable, Object>();
-	}
+    public List<VAR> getVariables() {
+        return new ArrayList<>(variableToValueMap.keySet());
+    }
 
-	public List<Variable> getVariables() {
-		return Collections.unmodifiableList(variables);
-	}
+    public VAL getValue(VAR var) {
+        return variableToValueMap.get(var);
+    }
 
-	public Object getAssignment(Variable var) {
-		return variableToValue.get(var);
-	}
+    public VAL add(VAR var, VAL value) {
+        assert value != null;
+        return variableToValueMap.put(var, value);
+    }
 
-	public void setAssignment(Variable var, Object value) {
-		if (!variableToValue.containsKey(var))
-			variables.add(var);
-		variableToValue.put(var, value);
-	}
+    public VAL remove(VAR var) {
+        return variableToValueMap.remove(var);
+    }
 
-	public void removeAssignment(Variable var) {
-		if (hasAssignmentFor(var)) {
-			variables.remove(var);
-			variableToValue.remove(var);
-		}
-	}
+    public boolean contains(VAR var) {
+        return variableToValueMap.containsKey(var);
+    }
 
-	public boolean hasAssignmentFor(Variable var) {
-		return variableToValue.get(var) != null;
-	}
+    /**
+     * Returns true if this assignment does not violate any constraints of
+     * <code>constraints</code>.
+     */
+    public boolean isConsistent(List<Constraint<VAR, VAL>> constraints) {
+        return constraints.stream().allMatch(cons -> cons.isSatisfiedWith(this));
+    }
 
-	/**
-	 * Returns true if this assignment does not violate any constraints of
-	 * <code>constraints</code>.
-	 */
-	public boolean isConsistent(List<Constraint> constraints) {
-		for (Constraint cons : constraints)
-			if (!cons.isSatisfiedWith(this))
-				return false;
-		return true;
-	}
+    /**
+     * Returns true if this assignment assigns values to every variable of
+     * <code>vars</code>.
+     */
+    public boolean isComplete(List<VAR> vars) {
+        return vars.stream().allMatch(this::contains);
+    }
 
-	/**
-	 * Returns true if this assignment assigns values to every variable of
-	 * <code>vars</code>.
-	 */
-	public boolean isComplete(List<Variable> vars) {
-		for (Variable var : vars) {
-			if (!hasAssignmentFor(var))
-				return false;
-		}
-		return true;
-	}
+    /**
+     * Returns true if this assignment is consistent as well as complete with
+     * respect to the given CSP.
+     */
+    public boolean isSolution(CSP<VAR, VAL> csp) {
+        return isConsistent(csp.getConstraints()) && isComplete(csp.getVariables());
+    }
 
-	/**
-	 * Returns true if this assignment assigns values to every variable of
-	 * <code>vars</code>.
-	 */
-	public boolean isComplete(Variable[] vars) {
-		for (Variable var : vars) {
-			if (!hasAssignmentFor(var))
-				return false;
-		}
-		return true;
-	}
+    @SuppressWarnings("unchecked")
+    @Override
+    public Assignment<VAR, VAL> clone() {
+        Assignment<VAR, VAL> result;
+        try {
+            result = (Assignment<VAR, VAL>) super.clone();
+            result.variableToValueMap = new LinkedHashMap<>(variableToValueMap);
+        } catch (CloneNotSupportedException e) {
+            throw new UnsupportedOperationException("Could not clone assignment."); // should never happen!
+        }
+        return result;
+    }
 
-	/**
-	 * Returns true if this assignment is consistent as well as complete with
-	 * respect to the given CSP.
-	 */
-	public boolean isSolution(CSP csp) {
-		return isConsistent(csp.getConstraints())
-				&& isComplete(csp.getVariables());
-	}
-
-	public Assignment copy() {
-		Assignment copy = new Assignment();
-		for (Variable var : variables) {
-			copy.setAssignment(var, variableToValue.get(var));
-		}
-		return copy;
-	}
-
-	@Override
-	public String toString() {
-		boolean comma = false;
-		StringBuffer result = new StringBuffer("{");
-		for (Variable var : variables) {
-			if (comma)
-				result.append(", ");
-			result.append(var + "=" + variableToValue.get(var));
-			comma = true;
-		}
-		result.append("}");
-		return result.toString();
-	}
+    @Override
+    public String toString() {
+        StringBuilder result = new StringBuilder("{");
+        for (Map.Entry<VAR, VAL> entry : variableToValueMap.entrySet()) {
+            if (result.length() > 1)
+                result.append(", ");
+            result.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        result.append("}");
+        return result.toString();
+    }
 }

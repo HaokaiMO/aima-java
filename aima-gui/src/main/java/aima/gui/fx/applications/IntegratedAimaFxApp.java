@@ -1,7 +1,10 @@
 package aima.gui.fx.applications;
 
+import aima.gui.demo.agent.MapAgentDemo;
 import aima.gui.demo.agent.NondeterministicVacuumEnvironmentDemo;
 import aima.gui.demo.agent.TrivialVacuumDemo;
+import aima.gui.demo.agent.WumpusAgentDemo;
+import aima.gui.demo.learning.LearningDemo;
 import aima.gui.demo.logic.DpllDemo;
 import aima.gui.demo.logic.FolDemo;
 import aima.gui.demo.logic.PlFcEntailsDemo;
@@ -14,9 +17,10 @@ import aima.gui.demo.search.NQueensDemo;
 import aima.gui.demo.search.TicTacToeDemo;
 import aima.gui.fx.applications.agent.RouteFindingAgentApp;
 import aima.gui.fx.applications.agent.VacuumAgentApp;
-import aima.gui.fx.applications.search.CspMapColoringApp;
-import aima.gui.fx.applications.search.CspNQueensApp;
-import aima.gui.fx.applications.search.CspNQueensDemo;
+import aima.gui.fx.applications.agent.WumpusAgentApp;
+import aima.gui.fx.applications.search.MapColoringCspApp;
+import aima.gui.fx.applications.search.NQueensCspApp;
+import aima.gui.fx.applications.search.NQueensCspDemo;
 import aima.gui.fx.applications.search.NQueensSearchApp;
 import aima.gui.fx.applications.search.NQueensSearchDemo;
 import aima.gui.fx.applications.search.games.ConnectFourApp;
@@ -56,29 +60,32 @@ public class IntegratedAimaFxApp extends Application {
 	public static void defineContent(IntegratedAppBuilder builder) {
 		builder.registerApp(VacuumAgentApp.class);
 		builder.registerApp(RouteFindingAgentApp.class);
+		builder.registerApp(WumpusAgentApp.class);
 
-		builder.registerApp(CspMapColoringApp.class);
-		builder.registerApp(CspNQueensApp.class);
+		builder.registerApp(MapColoringCspApp.class);
+		builder.registerApp(NQueensCspApp.class);
 		builder.registerApp(NQueensSearchApp.class);
 
 		builder.registerApp(EightPuzzleApp.class);
-		builder.registerApp(ConnectFourApp.class);
 		builder.registerApp(TicTacToeApp.class);
+		builder.registerApp(ConnectFourApp.class);
 		builder.registerApp(SimpleSudokuApp.class);
 
 		builder.registerApp(SimulatedAnnealingMaximumFinderApp.class);
 		builder.registerApp(GeneticMaximumFinderApp.class);
 
-		builder.registerDemo(CspNQueensDemo.class);
+		builder.registerDemo(NQueensCspDemo.class);
 		builder.registerDemo(GeneticMaximumFinderDemo.class);
 
-		builder.registerDemo(NQueensSearchDemo.class);
 		builder.registerDemo(TrivialVacuumDemo.class);
+		builder.registerDemo(NondeterministicVacuumEnvironmentDemo.class);
+		builder.registerDemo(MapAgentDemo.class);
+		builder.registerDemo(WumpusAgentDemo.class);
+		builder.registerDemo(NQueensSearchDemo.class);
 		builder.registerDemo(EightPuzzleDemo.class);
 		builder.registerDemo(TicTacToeDemo.class);
 		builder.registerDemo(NQueensDemo.class);
 		builder.registerDemo(MapColoringCspDemo.class);
-		builder.registerDemo(NondeterministicVacuumEnvironmentDemo.class);
 
 		builder.registerDemo(TTEntailsDemo.class);
 		builder.registerDemo(PlFcEntailsDemo.class);
@@ -87,8 +94,8 @@ public class IntegratedAimaFxApp extends Application {
 		builder.registerDemo(WalkSatDemo.class);
 		builder.registerDemo(FolDemo.class);
 
-		// builder.registerDemo(ProbabilityProg.class); // to slow.
-		// builder.registerDemo(LearningProg.class); // to slow.
+		// builder.registerDemo(ProbabilityDemo.class); // to slow.
+		builder.registerDemo(LearningDemo.class); // to slow.
 	}
 
 }

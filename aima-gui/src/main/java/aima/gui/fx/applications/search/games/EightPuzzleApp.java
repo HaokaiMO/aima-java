@@ -1,16 +1,11 @@
 package aima.gui.fx.applications.search.games;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
-
 import aima.core.agent.Action;
 import aima.core.environment.eightpuzzle.BidirectionalEightPuzzleProblem;
 import aima.core.environment.eightpuzzle.EightPuzzleBoard;
-import aima.core.environment.eightpuzzle.ManhattanHeuristicFunction;
-import aima.core.environment.eightpuzzle.MisplacedTilleHeuristicFunction;
+import aima.core.environment.eightpuzzle.EightPuzzleFunctions;
 import aima.core.search.framework.Metrics;
+import aima.core.search.framework.Node;
 import aima.core.search.framework.SearchForActions;
 import aima.core.search.framework.problem.Problem;
 import aima.core.search.framework.qsearch.BidirectionalSearch;
@@ -22,16 +17,18 @@ import aima.core.search.local.SimulatedAnnealingSearch;
 import aima.core.search.uninformed.BreadthFirstSearch;
 import aima.core.search.uninformed.DepthLimitedSearch;
 import aima.core.search.uninformed.IterativeDeepeningSearch;
-import aima.core.util.CancelableThread;
+import aima.core.util.Tasks;
 import aima.gui.fx.framework.IntegrableApplication;
 import aima.gui.fx.framework.Parameter;
-import aima.gui.fx.framework.SimulationPaneBuilder;
-import aima.gui.fx.framework.SimulationPaneCtrl;
+import aima.gui.fx.framework.TaskExecutionPaneBuilder;
+import aima.gui.fx.framework.TaskExecutionPaneCtrl;
 import aima.gui.fx.views.EightPuzzleViewCtrl;
 import javafx.application.Platform;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
+
+import java.util.*;
 
 
 /**
@@ -50,32 +47,34 @@ public class EightPuzzleApp extends IntegrableApplication {
 	/** List of supported search algorithm names. */
 	protected static List<String> SEARCH_NAMES = new ArrayList<>();
 	/** List of supported search algorithms. */
-	protected static List<SearchForActions> SEARCH_ALGOS = new ArrayList<>();
+	protected static List<SearchForActions<EightPuzzleBoard, Action>> SEARCH_ALGOS = new ArrayList<>();
 
 	private EightPuzzleBoard board;
 
 	/** Adds a new item to the list of supported search algorithms. */
-	public static void addSearchAlgorithm(String name, SearchForActions algo) {
+	public static void addSearchAlgorithm(String name, SearchForActions<EightPuzzleBoard, Action> algo) {
 		SEARCH_NAMES.add(name);
 		SEARCH_ALGOS.add(algo);
 	}
 
 	static {
-		addSearchAlgorithm("Breadth First Search (Graph Search)", new BreadthFirstSearch(new GraphSearch()));
+		addSearchAlgorithm("Breadth First Search (Graph Search)", new BreadthFirstSearch<>(new GraphSearch<>()));
 		addSearchAlgorithm("Breadth First Search (Bidirectional Search)",
-				new BreadthFirstSearch(new BidirectionalSearch()));
-		addSearchAlgorithm("Depth Limited Search (9)", new DepthLimitedSearch(9));
-		addSearchAlgorithm("Iterative Deepening Search", new IterativeDeepeningSearch());
+				new BreadthFirstSearch<>(new BidirectionalSearch<>()));
+		addSearchAlgorithm("Depth Limited Search (9)", new DepthLimitedSearch<>(9));
+		addSearchAlgorithm("Iterative Deepening Search", new IterativeDeepeningSearch<>());
 		addSearchAlgorithm("Greedy Best First Search (MisplacedTileHeuristic)",
-				new GreedyBestFirstSearch(new GraphSearch(), new MisplacedTilleHeuristicFunction()));
+				new GreedyBestFirstSearch<>(new GraphSearch<>(), EightPuzzleFunctions::getNumberOfMisplacedTiles));
 		addSearchAlgorithm("Greedy Best First Search (ManhattanHeuristic)",
-				new GreedyBestFirstSearch(new GraphSearch(), new ManhattanHeuristicFunction()));
+				new GreedyBestFirstSearch<>(new GraphSearch<>(),
+						EightPuzzleFunctions::getManhattanDistance));
 		addSearchAlgorithm("AStar Search (MisplacedTileHeuristic)",
-				new AStarSearch(new GraphSearch(), new MisplacedTilleHeuristicFunction()));
+				new AStarSearch<>(new GraphSearch<>(), EightPuzzleFunctions::getNumberOfMisplacedTiles));
 		addSearchAlgorithm("AStar Search (ManhattanHeuristic)",
-				new AStarSearch(new GraphSearch(), new ManhattanHeuristicFunction()));
+				new AStarSearch<>(new GraphSearch<>(), EightPuzzleFunctions::getManhattanDistance));
 		addSearchAlgorithm("Simulated Annealing Search (ManhattanHeuristic)",
-				new SimulatedAnnealingSearch(new ManhattanHeuristicFunction(), new Scheduler(20, 0.05, 200)));
+				new SimulatedAnnealingSearch<>(EightPuzzleFunctions::getManhattanDistance,
+						new Scheduler(20, 0.05, 200)));
 	}
 
 
@@ -83,7 +82,7 @@ public class EightPuzzleApp extends IntegrableApplication {
 	public final static String PARAM_STRATEGY = "strategy";
 
 	private EightPuzzleViewCtrl stateViewCtrl;
-	private SimulationPaneCtrl simPaneCtrl;
+	private TaskExecutionPaneCtrl simPaneCtrl;
 
 	public EightPuzzleApp() {
 	}
@@ -106,11 +105,11 @@ public class EightPuzzleApp extends IntegrableApplication {
 
 		List<Parameter> params = createParameters();
 
-		SimulationPaneBuilder builder = new SimulationPaneBuilder();
+		TaskExecutionPaneBuilder builder = new TaskExecutionPaneBuilder();
 		builder.defineParameters(params);
 		builder.defineStateView(stateView);
 		builder.defineInitMethod(this::initialize);
-		builder.defineSimMethod(this::simulate);
+		builder.defineTaskMethod(this::startExperiment);
 		simPaneCtrl = builder.getResultFor(root);
 
 		return root;
@@ -161,34 +160,36 @@ public class EightPuzzleApp extends IntegrableApplication {
 
 	@Override
 	public void cleanup() {
-		simPaneCtrl.cancelSimulation();
+		simPaneCtrl.cancelExecution();
 	}
 
 	/** Starts the experiment. */
-	public void simulate() {
+	public void startExperiment() {
 		int strategyIdx = simPaneCtrl.getParamValueIndex(PARAM_STRATEGY);
 
-		Problem problem = new BidirectionalEightPuzzleProblem(board);
-		SearchForActions search = SEARCH_ALGOS.get(strategyIdx);
-		List<Action> actions = search.findActions(problem);
-		for (Action action : actions) {
-			if (action == EightPuzzleBoard.UP)
-				board.moveGapUp();
-			else if (action == EightPuzzleBoard.DOWN)
-				board.moveGapDown();
-			else if (action == EightPuzzleBoard.LEFT)
-				board.moveGapLeft();
-			else if (action == EightPuzzleBoard.RIGHT)
-				board.moveGapRight();
-			Metrics m = new Metrics();
-			m.set("manhattanHeuristic", new ManhattanHeuristicFunction().h(board));
-			updateStateView(m);
-			if (CancelableThread.currIsCanceled())
-				break;
-			simPaneCtrl.waitAfterStep();
+		Problem<EightPuzzleBoard, Action> problem = new BidirectionalEightPuzzleProblem(board);
+		SearchForActions<EightPuzzleBoard, Action> search = SEARCH_ALGOS.get(strategyIdx);
+		Optional<List<Action>> actions = search.findActions(problem);
+		if (actions.isPresent()) {
+			for (Action action : actions.get()) {
+				if (action == EightPuzzleBoard.UP)
+					board.moveGapUp();
+				else if (action == EightPuzzleBoard.DOWN)
+					board.moveGapDown();
+				else if (action == EightPuzzleBoard.LEFT)
+					board.moveGapLeft();
+				else if (action == EightPuzzleBoard.RIGHT)
+					board.moveGapRight();
+				Metrics m = new Metrics();
+				m.set("misplacedTileHeuristic", EightPuzzleFunctions.getNumberOfMisplacedTiles(new Node<>(board)));
+				m.set("manhattanHeuristic", EightPuzzleFunctions.getManhattanDistance(new Node<>(board)));
+				updateStateView(m);
+				if (Tasks.currIsCancelled())
+					break;
+				simPaneCtrl.waitAfterStep();
+			}
 		}
 		updateStateView(search.getMetrics());
-
 	}
 
 	/**

@@ -209,24 +209,23 @@ public class ConnectFourState implements Cloneable {
 		ConnectFourState result = null;
 		try {
 			result = (ConnectFourState) super.clone();
+			result.board = board.clone();
 		} catch (CloneNotSupportedException e) {
 			e.printStackTrace();
 		}
-		result.board = board.clone();
 		return result;
 	}
 
 	@Override
 	public int hashCode() {
 		int result = 0;
-		for (int i = 0; i < board.length; i++)
-			result = result * 7 + board[i] + 1;
+		for (byte aBoard : board) result = result * 7 + aBoard + 1;
 		return result;
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof ConnectFourState) {
+		if (obj != null && getClass() == obj.getClass()) {
 			ConnectFourState s = (ConnectFourState) obj;
 			for (int i = 0; i < board.length; i++)
 				if (board[i] != s.board[i])
@@ -239,7 +238,7 @@ public class ConnectFourState implements Cloneable {
 	// ////////////////////////////////////////////////////////////////////
 	// nested classes
 
-	static class WinPositionInfo {
+	private static class WinPositionInfo {
 		int row = -1;
 		int col = -1;
 		int diskCount;

@@ -1,12 +1,11 @@
 package aimax.osm.routing;
 
-import aima.core.search.framework.problem.BidirectionalProblem;
-import aima.core.search.framework.problem.DefaultGoalTest;
-import aima.core.search.framework.problem.Problem;
-import aima.core.search.framework.problem.StepCostFunction;
+import aima.core.search.framework.problem.*;
 import aimax.osm.data.MapWayFilter;
 import aimax.osm.data.entities.MapNode;
-import aimax.osm.routing.OsmActionsFunction.OneWayMode;
+import aimax.osm.routing.OsmFunctions.OneWayMode;
+
+import java.util.function.Predicate;
 
 /**
  * Implements a route finding problem whose representation is directly based on
@@ -16,9 +15,10 @@ import aimax.osm.routing.OsmActionsFunction.OneWayMode;
  * 
  * @author Ruediger Lunde
  */
-public class RouteFindingProblem extends Problem implements BidirectionalProblem {
+public class RouteFindingProblem extends GeneralProblem<MapNode, OsmMoveAction>
+		implements BidirectionalProblem<MapNode, OsmMoveAction> {
 
-	Problem reverseProblem;
+	private Problem<MapNode, OsmMoveAction> reverseProblem;
 
 	/**
 	 * Creates a new route planning problem.
@@ -31,7 +31,7 @@ public class RouteFindingProblem extends Problem implements BidirectionalProblem
 	 *            A filter for ways constraining routing results.
 	 */
 	public RouteFindingProblem(MapNode from, MapNode to, MapWayFilter filter, boolean ignoreOneWays) {
-		this(from, to, filter, ignoreOneWays, new OsmDistanceStepCostFunction());
+		this(from, to, filter, ignoreOneWays, OsmFunctions::getDistanceStepCosts);
 	}
 
 	/**
@@ -47,25 +47,21 @@ public class RouteFindingProblem extends Problem implements BidirectionalProblem
 	 *            Maps <code>OsmMoveAction</code>s to costs.
 	 */
 	public RouteFindingProblem(MapNode from, MapNode to, MapWayFilter filter, boolean ignoreOneWays,
-			StepCostFunction costs) {
-		OneWayMode fMode = ignoreOneWays ? OneWayMode.IGNORE : OneWayMode.TRAVEL_FORWARD;
-		OneWayMode rMode = ignoreOneWays ? OneWayMode.IGNORE : OneWayMode.TRAVEL_BACKWARDS;
+			StepCostFunction<MapNode, OsmMoveAction> costs) {
+		super(from, OsmFunctions.createActionFunction
+						(filter, ignoreOneWays ? OneWayMode.IGNORE : OneWayMode.TRAVEL_FORWARD, to),
+				OsmFunctions::getResult, Predicate.isEqual(to), costs);
 
-		initialState = from;
-		actionsFunction = new OsmActionsFunction(filter, fMode, to);
-		resultFunction = new OsmResultFunction();
-		goalTest = new DefaultGoalTest(to);
-		stepCostFunction = costs;
-
-		reverseProblem = new Problem(to, new OsmActionsFunction(filter, rMode, from), resultFunction,
-				new DefaultGoalTest(from), costs);
+		reverseProblem = new GeneralProblem<>(to, OsmFunctions.createActionFunction
+						(filter, ignoreOneWays ? OneWayMode.IGNORE : OneWayMode.TRAVEL_BACKWARDS, from),
+				OsmFunctions::getResult, Predicate.isEqual(from), costs);
 	}
 
-	public Problem getOriginalProblem() {
+	public Problem<MapNode, OsmMoveAction> getOriginalProblem() {
 		return this;
 	}
 
-	public Problem getReverseProblem() {
+	public Problem<MapNode, OsmMoveAction> getReverseProblem() {
 		return reverseProblem;
 	}
 }

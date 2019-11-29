@@ -1,13 +1,12 @@
 package aima.core.search.informed;
 
-import java.util.Comparator;
-
-import aima.core.search.framework.Informed;
 import aima.core.search.framework.Node;
-import aima.core.search.framework.PrioritySearch;
-import aima.core.search.framework.evalfunc.EvaluationFunction;
-import aima.core.search.framework.evalfunc.HeuristicFunction;
+import aima.core.search.framework.QueueBasedSearch;
+import aima.core.search.framework.QueueFactory;
 import aima.core.search.framework.qsearch.QueueSearch;
+
+import java.util.Comparator;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Artificial Intelligence A Modern Approach (3rd Edition): page 92.<br>
@@ -18,45 +17,34 @@ import aima.core.search.framework.qsearch.QueueSearch;
  * the node with the lowest evaluation is expanded first. The implementation of
  * best-first graph search is identical to that for uniform-cost search (Figure
  * 3.14), except for the use of f instead of g to order the priority queue.
- * 
+ *
+ * @author Ruediger Lunde
  * @author Ciaran O'Reilly
  * @author Mike Stampone
- * @author Ruediger Lunde
  */
-public class BestFirstSearch extends PrioritySearch implements Informed {
+public class BestFirstSearch<S, A> extends QueueBasedSearch<S, A> implements Informed<S, A> {
 
-	private final EvaluationFunction evalFunc;
+	private final EvaluationFunction<S, A> evalFn;
 	
 	/**
-	 * Constructs a best first search from a specified search problem and
+	 * Constructs a best first search from a specified search execution strategy and an
 	 * evaluation function.
 	 * 
 	 * @param impl
-	 *            a search space exploration strategy.
-	 * @param ef
-	 *            an evaluation function, which returns a number purporting to
+	 *            A search execution strategy.
+	 * @param evalFn
+	 *            An evaluation function, which returns a number purporting to
 	 *            describe the desirability (or lack thereof) of expanding a
 	 *            node.
 	 */
-	public BestFirstSearch(QueueSearch impl, EvaluationFunction ef) {
-		super(impl, createComparator(ef));
-		evalFunc = ef;
+	public BestFirstSearch(QueueSearch<S, A> impl, final EvaluationFunction<S, A> evalFn) {
+		super(impl, QueueFactory.createPriorityQueue(Comparator.comparing(evalFn::applyAsDouble)));
+		this.evalFn = evalFn;
 	}
 
-	/** Modifies the evaluation function if it is a {@link HeuristicEvaluationFunction}. */
+	/** Modifies the evaluation function. */
 	@Override
-	public void setHeuristicFunction(HeuristicFunction hf) {
-		if (evalFunc instanceof HeuristicEvaluationFunction)
-			((HeuristicEvaluationFunction) evalFunc).setHeuristicFunction(hf);
-	}
-	
-	private static Comparator<Node> createComparator(final EvaluationFunction ef) {
-		return new Comparator<Node>() {
-			public int compare(Node n1, Node n2) {
-				double f1 = ef.f(n1);
-				double f2 = ef.f(n2);
-				return Double.compare(f1, f2);
-			}
-		};
+	public void setHeuristicFunction(ToDoubleFunction<Node<S, A>> h) {
+		 evalFn.setHeuristicFunction(h);
 	}
 }

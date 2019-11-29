@@ -1,124 +1,107 @@
 package aima.core.environment.map;
 
-import aima.core.agent.Action;
-import aima.core.agent.EnvironmentViewNotifier;
-import aima.core.agent.Percept;
-import aima.core.agent.State;
+import aima.core.agent.Notifier;
 import aima.core.agent.impl.DynamicPercept;
 import aima.core.agent.impl.DynamicState;
-import aima.core.search.framework.Informed;
-import aima.core.search.framework.ProblemSolvingAgent;
+import aima.core.search.agent.ProblemSolvingAgent;
+import aima.core.search.framework.Node;
 import aima.core.search.framework.SearchForActions;
-import aima.core.search.framework.evalfunc.HeuristicFunctionFactory;
 import aima.core.search.framework.problem.Problem;
+import aima.core.search.informed.Informed;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Variant of {@link aima.core.environment.map.SimpleMapAgent} which works
- * correctly also for A* and other best-first search implementations. It can be
- * extended also for scenarios, in which the agent faces unforeseen events. When
- * using informed search and more then one goal, make sure, that a heuristic
- * function factory is provided!
- * 
- * @author Ruediger Lunde
+ * correctly for A* and other best-first search implementations. It can be
+ * extended for scenarios, in which the agent faces unforeseen events during
+ * plan execution. When using informed search and more then one goal, make
+ * sure, that a heuristic function factory is provided!
  *
+ * @author Ruediger Lunde
  */
-public class MapAgent extends ProblemSolvingAgent {
+public class MapAgent extends ProblemSolvingAgent<DynamicPercept, String, MoveToAction> {
 
-	protected final Map map;
-	protected final DynamicState state = new DynamicState();
-	protected final List<String> goals = new ArrayList<>();
-	protected int currGoalIdx = -1;
+    protected final Map map;
+    protected final DynamicState state = new DynamicState();
+    protected final List<String> goals = new ArrayList<>();
+    protected int nextGoalPos = 0;
 
-	// possibly null...
-	protected EnvironmentViewNotifier notifier = null;
-	private SearchForActions search = null;
-	private HeuristicFunctionFactory hfFactory;
+    private SearchForActions<String, MoveToAction> search;
+    private Function<String, ToDoubleFunction<Node<String, MoveToAction>>> hFnFactory;
+    protected Notifier notifier;
 
-	public MapAgent(Map map, SearchForActions search, String goal) {
-		this.map = map;
-		this.search = search;
-		goals.add(goal);
-	}
+    public MapAgent(Map map, SearchForActions<String, MoveToAction> search, String goal) {
+        this.map = map;
+        this.search = search;
+        goals.add(goal);
+    }
 
-	public MapAgent(Map map, SearchForActions search, String goal, EnvironmentViewNotifier notifier) {
-		this(map, search, goal);
-		this.notifier = notifier;
-	}
+    public MapAgent(Map map, SearchForActions<String, MoveToAction> search, List<String> goals) {
+        this.map = map;
+        this.search = search;
+        this.goals.addAll(goals);
+    }
 
-	public MapAgent(Map map, SearchForActions search, List<String> goals) {
-		this.map = map;
-		this.search = search;
-		this.goals.addAll(goals);
-	}
+    /**
+     * Constructor.
+     * @param map Information about the environment
+     * @param search Search strategy to be used
+     * @param goals List of locations to be visited
+     * @param hFnFactory Factory, mapping goals to heuristic functions. When using
+     *                   informed search, the agent must be able to estimate remaining costs for
+     *                   the goals he has selected.
+     */
+    public MapAgent(Map map, SearchForActions<String, MoveToAction> search, List<String> goals,
+                    Function<String, ToDoubleFunction<Node<String, MoveToAction>>> hFnFactory) {
+        this(map, search, goals);
+        this.hFnFactory = hFnFactory;
+    }
 
-	public MapAgent(Map map, SearchForActions search, List<String> goals, EnvironmentViewNotifier notifier) {
-		this(map, search, goals);
-		this.notifier = notifier;
-	}
+    /**  Sets a notifier which gets informed about decisions of the agent */
+    public MapAgent setNotifier(Notifier notifier) {
+        this.notifier = notifier;
+        return this;
+    }
 
-	public MapAgent(Map map, SearchForActions search, List<String> goals, EnvironmentViewNotifier notifier,
-			HeuristicFunctionFactory hfFactory) {
-		this(map, search, goals, notifier);
-		this.hfFactory = hfFactory;
-	}
+    //
+    // PROTECTED METHODS
+    //
+    @Override
+    protected void updateState(DynamicPercept percept) {
+        state.setAttribute(AttNames.AGENT_LOCATION, percept.getAttribute(AttNames.PERCEPT_IN));
+    }
 
-	//
-	// PROTECTED METHODS
-	//
-	@Override
-	protected State updateState(Percept p) {
-		DynamicPercept dp = (DynamicPercept) p;
-		state.setAttribute(DynAttributeNames.AGENT_LOCATION, dp.getAttribute(DynAttributeNames.PERCEPT_IN));
-		return state;
-	}
+    @SuppressWarnings("unchecked")
+    @Override
+    protected Optional<Object> formulateGoal() {
+        String goal = null;
+        if (nextGoalPos < goals.size()) {
+            goal = goals.get(nextGoalPos++);
+            if (hFnFactory != null && search instanceof Informed)
+                ((Informed<String, MoveToAction>) search).setHeuristicFunction(hFnFactory.apply(goal));
+            if (notifier != null)
+                notifier.notify("Current location: In(" + state.getAttribute(AttNames.AGENT_LOCATION)
+                        + "), Goal: In(" + goal + ")");
+        }
+        return Optional.ofNullable(goal);
+    }
 
-	@Override
-	protected Object formulateGoal() {
-		Object goal = null;
-		if (currGoalIdx < goals.size() - 1) {
-			goal = goals.get(++currGoalIdx);
-			if (notifier != null)
-				notifier.notifyViews("CurrentLocation=In(" + state.getAttribute(DynAttributeNames.AGENT_LOCATION)
-						+ "), Goal=In(" + goal + ")");
-			modifyHeuristicFunction(goal);
-		}
-		return goal;
-	}
+    @Override
+    protected Problem<String, MoveToAction> formulateProblem(Object goal) {
+        return new BidirectionalMapProblem(map, (String) state.getAttribute(AttNames.AGENT_LOCATION),
+                (String) goal);
+    }
 
-	@Override
-	protected Problem formulateProblem(Object goal) {
-		return new BidirectionalMapProblem(map, (String) state.getAttribute(DynAttributeNames.AGENT_LOCATION),
-				(String) goal);
-	}
-
-	@Override
-	protected List<Action> search(Problem problem) {
-		List<Action> result = new ArrayList<Action>();
-		try {
-			result.addAll(search.findActions(problem));
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-		notifyViewOfMetrics();
-		return result;
-	}
-
-	protected void notifyViewOfMetrics() {
-		if (notifier != null) {
-			Set<String> keys = search.getMetrics().keySet();
-			for (String key : keys) {
-				notifier.notifyViews("METRIC[" + key + "]=" + search.getMetrics().get(key));
-			}
-		}
-	}
-
-	private void modifyHeuristicFunction(Object goal) {
-		if (hfFactory != null && search instanceof Informed) {
-			((Informed) search).setHeuristicFunction(hfFactory.createHeuristicFunction(goal));
-		}
-	}
+    @Override
+    protected Optional<List<MoveToAction>> search(Problem<String, MoveToAction> problem) {
+        Optional<List<MoveToAction>> result = search.findActions(problem);
+        if (notifier != null)
+            notifier.notify("Search" + search.getMetrics());
+        return result;
+    }
 }

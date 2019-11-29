@@ -1,14 +1,14 @@
 package aima.core.search.local;
 
+import aima.core.search.framework.Metrics;
+import aima.core.util.Tasks;
+import aima.core.util.Util;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Random;
-
-import aima.core.search.framework.Metrics;
-import aima.core.search.framework.problem.GoalTest;
-import aima.core.util.CancelableThread;
-import aima.core.util.Util;
+import java.util.function.Predicate;
 
 /**
  * Artificial Intelligence A Modern Approach (3rd Edition): Figure 4.8, page
@@ -64,7 +64,7 @@ public class GeneticAlgorithm<A> {
 	protected double mutationProbability;
 	
 	protected Random random;
-	private List<ProgressTracer<A>> progressTracers = new ArrayList<ProgressTracer<A>>();
+	private List<ProgressTracker<A>> progressTrackers = new ArrayList<>();
 
 	public GeneticAlgorithm(int individualLength, Collection<A> finiteAlphabet, double mutationProbability) {
 		this(individualLength, finiteAlphabet, mutationProbability, new Random());
@@ -81,8 +81,8 @@ public class GeneticAlgorithm<A> {
 	}
 
 	/** Progress tracers can be used to display progress information. */
-	public void addProgressTracer(ProgressTracer<A> pTracer) {
-		progressTracers.add(pTracer);
+	public void addProgressTracer(ProgressTracker<A> pTracker) {
+		progressTrackers.add(pTracker);
 	}
 	
 	/**
@@ -91,11 +91,7 @@ public class GeneticAlgorithm<A> {
 	 */
 	public Individual<A> geneticAlgorithm(Collection<Individual<A>> initPopulation,
 			FitnessFunction<A> fitnessFn, final int maxIterations) {
-		GoalTest goalTest = new GoalTest() {
-			@Override
-			public boolean isGoalState(Object state) {
-				return getIterations() >= maxIterations;
-			}};
+		Predicate<Individual<A>> goalTest = state -> getIterations() >= maxIterations;
 		return geneticAlgorithm(initPopulation, fitnessFn, goalTest, 0L);
 	}
 	
@@ -104,7 +100,7 @@ public class GeneticAlgorithm<A> {
 	 * specified population, according to the specified FITNESS-FN and goal
 	 * test.
 	 * 
-	 * @param population
+	 * @param initPopulation
 	 *            a set of individuals
 	 * @param fitnessFn
 	 *            a function that measures the fitness of an individual
@@ -122,11 +118,11 @@ public class GeneticAlgorithm<A> {
 	// inputs: population, a set of individuals
 	// FITNESS-FN, a function that measures the fitness of an individual
 	public Individual<A> geneticAlgorithm(Collection<Individual<A>> initPopulation, FitnessFunction<A> fitnessFn,
-			GoalTest goalTest, long maxTimeMilliseconds) {
+										  Predicate<Individual<A>> goalTest, long maxTimeMilliseconds) {
 		Individual<A> bestIndividual = null;
 
 		// Create a local copy of the population to work with
-		List<Individual<A>> population = new ArrayList<Individual<A>>(initPopulation);
+		List<Individual<A>> population = new ArrayList<>(initPopulation);
 		// Validate the population and setup the instrumentation
 		validatePopulation(population);
 		updateMetrics(population, 0, 0L);
@@ -144,11 +140,11 @@ public class GeneticAlgorithm<A> {
 			// until some individual is fit enough, or enough time has elapsed
 			if (maxTimeMilliseconds > 0L && (System.currentTimeMillis() - startTime) > maxTimeMilliseconds)
 				break;
-			if (CancelableThread.currIsCanceled())
+			if (Tasks.currIsCancelled())
 				break;
-		} while (!goalTest.isGoalState(bestIndividual));
+		} while (!goalTest.test(bestIndividual));
 
-		notifyProgressTracers(itCount, population);
+		notifyProgressTrackers(itCount, population);
 		// return the best individual in population, according to FITNESS-FN
 		return bestIndividual;
 	}
@@ -236,7 +232,7 @@ public class GeneticAlgorithm<A> {
 	 */
 	protected List<Individual<A>> nextGeneration(List<Individual<A>> population, FitnessFunction<A> fitnessFn) {
 		// new_population <- empty set
-		List<Individual<A>> newPopulation = new ArrayList<Individual<A>>(population.size());
+		List<Individual<A>> newPopulation = new ArrayList<>(population.size());
 		// for i = 1 to SIZE(population) do
 		for (int i = 0; i < population.size(); i++) {
 			// x <- RANDOM-SELECTION(population, FITNESS-FN)
@@ -252,7 +248,7 @@ public class GeneticAlgorithm<A> {
 			// add child to new_population
 			newPopulation.add(child);
 		}
-		notifyProgressTracers(getIterations(), population);
+		notifyProgressTrackers(getIterations(), population);
 		return newPopulation;
 	}
 
@@ -297,8 +293,7 @@ public class GeneticAlgorithm<A> {
 		childRepresentation.addAll(x.getRepresentation().subList(0, c));
 		childRepresentation.addAll(y.getRepresentation().subList(c, individualLength));
 
-		Individual<A> child = new Individual<A>(childRepresentation);
-		return child;
+		return new Individual<A>(childRepresentation);
 	}
 
 	protected Individual<A> mutate(Individual<A> child) {
@@ -309,10 +304,8 @@ public class GeneticAlgorithm<A> {
 
 		mutatedRepresentation.set(mutateOffset, finiteAlphabet.get(alphaOffset));
 
-		Individual<A> mutatedChild = new Individual<A>(mutatedRepresentation);
-
-		return mutatedChild;
-	}
+		return new Individual<A>(mutatedRepresentation);
+}
 
 	protected int randomOffset(int length) {
 		return random.nextInt(length);
@@ -334,9 +327,9 @@ public class GeneticAlgorithm<A> {
 		}
 	}
 	
-	private void notifyProgressTracers(int itCount, Collection<Individual<A>> generation) {
-		for (ProgressTracer<A> tracer : progressTracers)
-			tracer.traceProgress(getIterations(), generation);
+	private void notifyProgressTrackers(int itCount, Collection<Individual<A>> generation) {
+		for (ProgressTracker<A> tracer : progressTrackers)
+			tracer.trackProgress(getIterations(), generation);
 	}
 	
 	/**
@@ -344,7 +337,7 @@ public class GeneticAlgorithm<A> {
 	 * 
 	 * @author Ruediger Lunde
 	 */
-	public interface ProgressTracer<A> {
-		void traceProgress(int itCount, Collection<Individual<A>> population);
+	public interface ProgressTracker<A> {
+		void trackProgress(int itCount, Collection<Individual<A>> population);
 	}
 }

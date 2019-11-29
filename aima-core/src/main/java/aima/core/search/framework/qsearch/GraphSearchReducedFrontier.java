@@ -1,15 +1,9 @@
 package aima.core.search.framework.qsearch;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 import aima.core.search.framework.Node;
-import aima.core.search.framework.NodeExpander;
+import aima.core.search.framework.NodeFactory;
 import aima.core.search.framework.problem.Problem;
 
 /**
@@ -33,7 +27,7 @@ import aima.core.search.framework.problem.Problem;
  * 
  * <br>
  * This implementation is based on the template method
- * {@link QueueSearch#findNode(Problem, Queue)} of the superclass and provides
+ * {@link TreeSearch#findNode(Problem, Queue)} of the superclass and provides
  * implementations for the needed primitive operations. It implements a special
  * version of graph search which keeps the frontier short by focusing on the
  * best node for each state only. It should only be used in combination with
@@ -41,23 +35,26 @@ import aima.core.search.framework.problem.Problem;
  * implementation checks whether another node for the same state already exists
  * and decides whether to replace it or ignore the new node depending on the
  * node's costs (comparator of priority queue is used, if available).
- * 
+ *
+ * @param <S> The type used to represent states
+ * @param <A> The type of the actions to be used to navigate through the state space
+ *
+ * @author Ruediger Lunde
  * @author Ravi Mohan
  * @author Ciaran O'Reilly
- * @author Ruediger Lunde
  */
-public class GraphSearchReducedFrontier extends QueueSearch {
+public class GraphSearchReducedFrontier<S, A> extends TreeSearch<S, A> {
 
-	private Set<Object> explored = new HashSet<Object>();
-	private Map<Object, Node> frontierNodeLookup = new HashMap<Object, Node>();
-	private Comparator<? super Node> nodeComparator = null;
+	private Set<S> explored = new HashSet<>();
+	private Map<S, Node<S, A>> frontierNodeLookup = new HashMap<>();
+	private Comparator<? super Node<S, A>> nodeComparator = null;
 
 	public GraphSearchReducedFrontier() {
-		this(new NodeExpander());
+		this(new NodeFactory<>());
 	}
 
-	public GraphSearchReducedFrontier(NodeExpander nodeExpander) {
-		super(nodeExpander);
+	public GraphSearchReducedFrontier(NodeFactory<S, A> nodeFactory) {
+		super(nodeFactory);
 	}
 
 	/**
@@ -65,16 +62,16 @@ public class GraphSearchReducedFrontier extends QueueSearch {
 	 * state map and calls the inherited version of search.
 	 */
 	@Override
-	public Node findNode(Problem problem, Queue<Node> frontier) {
+	public Optional<Node<S, A>> findNode(Problem<S, A> problem, Queue<Node<S, A>> frontier) {
 		// initialize the explored set to be empty
 		if (frontier instanceof PriorityQueue<?>)
-			nodeComparator = ((PriorityQueue<Node>) frontier).comparator();
+			nodeComparator = ((PriorityQueue<Node<S, A>>) frontier).comparator();
 		explored.clear();
 		frontierNodeLookup.clear();
 		return super.findNode(problem, frontier);
 	}
 
-	public Comparator<? super Node> getNodeComparator() {
+	public Comparator<? super Node<S, A>> getNodeComparator() {
 		return nodeComparator;
 	}
 
@@ -86,9 +83,9 @@ public class GraphSearchReducedFrontier extends QueueSearch {
 	 * node is replaced or the new node is dropped.
 	 */
 	@Override
-	protected void addToFrontier(Node node) {
+	protected void addToFrontier(Node<S, A> node) {
 		if (!explored.contains(node.getState())) {
-			Node frontierNode = frontierNodeLookup.get(node.getState());
+			Node<S, A> frontierNode = frontierNodeLookup.get(node.getState());
 			if (frontierNode == null) {
 				// child.STATE is not in frontier and not yet explored
 				frontier.add(node);
@@ -112,8 +109,8 @@ public class GraphSearchReducedFrontier extends QueueSearch {
 	 * @return the node at the head of the frontier.
 	 */
 	@Override
-	protected Node removeFromFrontier() {
-		Node result = frontier.remove();
+	protected Node<S, A> removeFromFrontier() {
+		Node<S, A> result = frontier.remove();
 		frontierNodeLookup.remove(result.getState());
 		// add the node to the explored set
 		explored.add(result.getState());

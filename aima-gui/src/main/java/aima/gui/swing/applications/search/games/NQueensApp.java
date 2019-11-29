@@ -1,31 +1,15 @@
 package aima.gui.swing.applications.search.games;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.Insets;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Properties;
-
-import javax.swing.JButton;
-
-import aima.core.agent.Action;
 import aima.core.agent.Agent;
 import aima.core.agent.Environment;
 import aima.core.agent.Percept;
 import aima.core.agent.impl.AbstractEnvironment;
-import aima.core.environment.nqueens.AttackingPairsHeuristic;
 import aima.core.environment.nqueens.NQueensBoard;
-import aima.core.environment.nqueens.NQueensFunctionFactory;
-import aima.core.environment.nqueens.NQueensGoalTest;
+import aima.core.environment.nqueens.NQueensFunctions;
 import aima.core.environment.nqueens.QueenAction;
-import aima.core.search.framework.SearchAgent;
+import aima.core.search.agent.SearchAgent;
 import aima.core.search.framework.SearchForActions;
-import aima.core.search.framework.problem.ActionsFunction;
+import aima.core.search.framework.problem.GeneralProblem;
 import aima.core.search.framework.problem.Problem;
 import aima.core.search.framework.qsearch.GraphSearch;
 import aima.core.search.framework.qsearch.TreeSearch;
@@ -38,12 +22,16 @@ import aima.core.search.uninformed.DepthFirstSearch;
 import aima.core.search.uninformed.DepthLimitedSearch;
 import aima.core.search.uninformed.IterativeDeepeningSearch;
 import aima.core.util.datastructure.XYLocation;
-import aima.gui.swing.framework.AgentAppController;
-import aima.gui.swing.framework.AgentAppEnvironmentView;
-import aima.gui.swing.framework.AgentAppFrame;
-import aima.gui.swing.framework.MessageLogger;
-import aima.gui.swing.framework.SimpleAgentApp;
-import aima.gui.swing.framework.SimulationThread;
+import aima.gui.swing.framework.*;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.function.Function;
 
 /**
  * Graphical n-queens game application. It demonstrates the performance of
@@ -53,49 +41,51 @@ import aima.gui.swing.framework.SimulationThread;
  * 
  * @author Ruediger Lunde
  */
-public class NQueensApp extends SimpleAgentApp {
+public class NQueensApp extends SimpleAgentApp<Percept, QueenAction> {
 
 	/** List of supported search algorithm names. */
-	protected static List<String> SEARCH_NAMES = new ArrayList<String>();
+	protected static List<String> SEARCH_NAMES = new ArrayList<>();
 	/** List of supported search algorithms. */
-	protected static List<SearchForActions> SEARCH_ALGOS = new ArrayList<SearchForActions>();
+	protected static List<SearchForActions<NQueensBoard, QueenAction>> SEARCH_ALGOS = new ArrayList<>();
 
 	/** Adds a new item to the list of supported search algorithms. */
-	public static void addSearchAlgorithm(String name, SearchForActions algo) {
+	public static void addSearchAlgorithm(String name, SearchForActions<NQueensBoard, QueenAction> algo) {
 		SEARCH_NAMES.add(name);
 		SEARCH_ALGOS.add(algo);
 	}
 
 	static {
 		addSearchAlgorithm("Depth First Search (Graph Search)",
-				new DepthFirstSearch(new GraphSearch()));
+				new DepthFirstSearch<>(new GraphSearch<>()));
 		addSearchAlgorithm("Breadth First Search (Tree Search)",
-				new BreadthFirstSearch(new TreeSearch()));
+				new BreadthFirstSearch<>(new TreeSearch<>()));
 		addSearchAlgorithm("Breadth First Search (Graph Search)",
-				new BreadthFirstSearch(new GraphSearch()));
-		addSearchAlgorithm("Depth Limited Search (8)", new DepthLimitedSearch(8));
-		addSearchAlgorithm("Iterative Deepening Search", new IterativeDeepeningSearch());
+				new BreadthFirstSearch<>(new GraphSearch<>()));
+		addSearchAlgorithm("Depth Limited Search (8)", new DepthLimitedSearch<>(8));
+		addSearchAlgorithm("Iterative Deepening Search", new IterativeDeepeningSearch<>());
 		addSearchAlgorithm("A* search (attacking pair heuristic)",
-				new AStarSearch(new GraphSearch(), new AttackingPairsHeuristic()));
-		addSearchAlgorithm("Hill Climbing Search", new HillClimbingSearch(new AttackingPairsHeuristic()));
+				new AStarSearch<>(new GraphSearch<>(), NQueensFunctions::getNumberOfAttackingPairs));
+		addSearchAlgorithm("Hill Climbing Search", new HillClimbingSearch<>
+				(n -> -NQueensFunctions.getNumberOfAttackingPairs(n)));
 		addSearchAlgorithm("Simulated Annealing Search",
-				new SimulatedAnnealingSearch(new AttackingPairsHeuristic(), new Scheduler(20, 0.045, 1000)));
+				new SimulatedAnnealingSearch<>(NQueensFunctions::getNumberOfAttackingPairs,
+						new Scheduler(20, 0.045, 1000)));
 	}
 
 	/** Returns a <code>NQueensView</code> instance. */
-	public AgentAppEnvironmentView createEnvironmentView() {
+	public AgentAppEnvironmentView<Percept, QueenAction> createEnvironmentView() {
 		return new NQueensView();
 	}
 
 	/** Returns a <code>NQueensFrame</code> instance. */
 	@Override
-	public AgentAppFrame createFrame() {
+	public AgentAppFrame<Percept, QueenAction> createFrame() {
 		return new NQueensFrame();
 	}
 
 	/** Returns a <code>NQueensController</code> instance. */
 	@Override
-	public AgentAppController createController() {
+	public AgentAppController<Percept, QueenAction> createController() {
 		return new NQueensController();
 	}
 
@@ -115,7 +105,7 @@ public class NQueensApp extends SimpleAgentApp {
 	/**
 	 * Adds some selectors to the base class and adjusts its size.
 	 */
-	protected static class NQueensFrame extends AgentAppFrame {
+	protected static class NQueensFrame extends AgentAppFrame<Percept, QueenAction> {
 		private static final long serialVersionUID = 1L;
 		public static String ENV_SEL = "EnvSelection";
 		public static String PROBLEM_SEL = "ProblemSelection";
@@ -137,7 +127,7 @@ public class NQueensApp extends SimpleAgentApp {
 	 * Displays the informations provided by a <code>NQueensEnvironment</code>
 	 * on a panel.
 	 */
-	protected static class NQueensView extends AgentAppEnvironmentView implements ActionListener {
+	protected static class NQueensView extends AgentAppEnvironmentView<Percept, QueenAction> implements ActionListener {
 		private static final long serialVersionUID = 1L;
 		protected JButton[] squareButtons;
 		protected int currSize = -1;
@@ -146,21 +136,21 @@ public class NQueensApp extends SimpleAgentApp {
 		}
 
 		@Override
-		public void setEnvironment(Environment env) {
+		public void setEnvironment(Environment<? extends Percept, ? extends QueenAction> env) {
 			super.setEnvironment(env);
 			showState();
-		}
-
-		/** Agent value null indicates a user initiated action. */
-		@Override
-		public void agentActed(Agent agent, Action action, Environment source) {
-			showState();
-			notify((agent == null ? "User: " : "") + action.toString());
 		}
 
 		@Override
 		public void agentAdded(Agent agent, Environment source) {
 			showState();
+		}
+
+		/** Agent value null indicates a user initiated action. */
+		@Override
+		public void agentActed(Agent<?, ?> agent, Percept percept, QueenAction action, Environment<?, ?> source) {
+			showState();
+			notify((agent == null ? "User: " : "") + action.toString());
 		}
 
 		/**
@@ -187,7 +177,7 @@ public class NQueensApp extends SimpleAgentApp {
 			Font f = new java.awt.Font(Font.SANS_SERIF, Font.PLAIN,
 					Math.min(getWidth(), getHeight()) * 3 / 4 / currSize);
 			for (XYLocation loc : board.getQueenPositions()) {
-				JButton square = squareButtons[loc.getXCoOrdinate() + loc.getYCoOrdinate() * currSize];
+				JButton square = squareButtons[loc.getX() + loc.getY() * currSize];
 				square.setForeground(board.isSquareUnderAttack(loc) ? Color.RED : Color.BLACK);
 				square.setFont(f);
 				square.setText("Q");
@@ -214,10 +204,10 @@ public class NQueensApp extends SimpleAgentApp {
 	/**
 	 * Defines how to react on standard simulation button events.
 	 */
-	protected static class NQueensController extends AgentAppController {
+	protected static class NQueensController extends AgentAppController<Percept, QueenAction> {
 
 		protected NQueensEnvironment env = null;
-		protected SearchAgent agent = null;
+		protected SearchAgent<Percept, NQueensBoard, QueenAction> agent = null;
 		protected boolean boardDirty;
 
 		/** Prepares next simulation. */
@@ -268,15 +258,15 @@ public class NQueensApp extends SimpleAgentApp {
 			if (agent == null) {
 				int pSel = frame.getSelection().getIndex(NQueensFrame.PROBLEM_SEL);
 				int sSel = frame.getSelection().getIndex(NQueensFrame.SEARCH_SEL);
-				ActionsFunction af;
+				Function<NQueensBoard, List<QueenAction>> actionsFn;
 				if (pSel == 0)
-					af = NQueensFunctionFactory.getIActionsFunction();
+					actionsFn = NQueensFunctions::getIFActions;
 				else
-					af = NQueensFunctionFactory.getCActionsFunction();
-				Problem problem = new Problem(env.getBoard(), af, NQueensFunctionFactory.getResultFunction(),
-						new NQueensGoalTest());
-				SearchForActions search = SEARCH_ALGOS.get(sSel);
-				agent = new SearchAgent(problem, search);
+					actionsFn = NQueensFunctions::getCSFActions;
+				Problem<NQueensBoard, QueenAction> problem = new GeneralProblem<>(env.getBoard(),
+						actionsFn, NQueensFunctions::getResult, NQueensFunctions::testGoal);
+				SearchForActions<NQueensBoard, QueenAction> search = SEARCH_ALGOS.get(sSel);
+				agent = new SearchAgent<>(problem, search);
 				env.addAgent(agent);
 			}
 		}
@@ -321,7 +311,7 @@ public class NQueensApp extends SimpleAgentApp {
 
 		/** Updates the status of the frame after simulation has finished. */
 		public void update(SimulationThread simulationThread) {
-			if (simulationThread.isCanceled()) {
+			if (simulationThread.isCancelled()) {
 				frame.setStatus("Task canceled.");
 			} else if (frame.simulationPaused()) {
 				frame.setStatus("Task paused.");
@@ -332,13 +322,12 @@ public class NQueensApp extends SimpleAgentApp {
 
 		/** Provides a text with statistical information about the last run. */
 		private String getStatistics() {
-			StringBuffer result = new StringBuffer();
+			StringBuilder result = new StringBuilder();
 			Properties properties = agent.getInstrumentation();
-			Iterator<Object> keys = properties.keySet().iterator();
-			while (keys.hasNext()) {
-				String key = (String) keys.next();
+			for (Object o : properties.keySet()) {
+				String key = (String) o;
 				String property = properties.getProperty(key);
-				result.append("\n" + key + " : " + property);
+				result.append("\n").append(key).append(" : ").append(property);
 			}
 			return result.toString();
 		}
@@ -350,14 +339,14 @@ public class NQueensApp extends SimpleAgentApp {
 				atype = QueenAction.REMOVE_QUEEN;
 			else
 				atype = QueenAction.PLACE_QUEEN;
-			env.executeAction(null, new QueenAction(atype, loc));
+			env.execute(null, new QueenAction(atype, loc));
 			agent = null;
 			frame.updateEnabledState();
 		}
 	}
 
 	/** Simple environment maintaining just the current board state. */
-	public static class NQueensEnvironment extends AbstractEnvironment {
+	public static class NQueensEnvironment extends AbstractEnvironment<Percept, QueenAction> {
 		NQueensBoard board;
 
 		public NQueensEnvironment(NQueensBoard board) {
@@ -372,24 +361,19 @@ public class NQueensApp extends SimpleAgentApp {
 		 * Executes the provided action and returns null.
 		 */
 		@Override
-		public void executeAction(Agent agent, Action action) {
-			if (action instanceof QueenAction) {
-				QueenAction act = (QueenAction) action;
-				XYLocation loc = new XYLocation(act.getX(), act.getY());
-				if (act.getName() == QueenAction.PLACE_QUEEN)
-					board.addQueenAt(loc);
-				else if (act.getName() == QueenAction.REMOVE_QUEEN)
-					board.removeQueenFrom(loc);
-				else if (act.getName() == QueenAction.MOVE_QUEEN)
-					board.moveQueenTo(loc);
-				if (agent == null)
-					notifyEnvironmentViews(agent, action);
-			}
+		public void execute(Agent<?, ?> agent, QueenAction action) {
+			XYLocation loc = new XYLocation(action.getX(), action.getY());
+			if (action.getName() == QueenAction.PLACE_QUEEN)
+				board.addQueenAt(loc);
+			else if (action.getName() == QueenAction.REMOVE_QUEEN)
+				board.removeQueenFrom(loc);
+			else if (action.getName() == QueenAction.MOVE_QUEEN)
+				board.moveQueenTo(loc);
 		}
 
 		/** Returns null. */
 		@Override
-		public Percept getPerceptSeenBy(Agent anAgent) {
+		public Percept getPerceptSeenBy(Agent<?, ?> anAgent) {
 			return null;
 		}
 	}

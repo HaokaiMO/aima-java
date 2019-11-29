@@ -14,7 +14,7 @@ import javax.swing.JFileChooser;
 import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
 
-import aima.core.util.CancelableThread;
+import aima.core.util.CancellableThread;
 import aimax.osm.data.DataResource;
 import aimax.osm.data.EntityClassifier;
 import aimax.osm.data.OsmMap;
@@ -151,7 +151,7 @@ public class MiniNaviApp implements ActionListener {
 					} else { // Establishing connection to GPS failed
 						gpsCombo.setSelectedIndex(0);
 					}
-				} else if (gpsFileChooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) { // simulate
+				} else if (gpsFileChooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) { // startExperiment
 					// GPS
 					locator.openFileConnection(gpsFileChooser.getSelectedFile());
 				}
@@ -210,7 +210,7 @@ public class MiniNaviApp implements ActionListener {
 	// ///////////////////////////////////////////////////////////////
 	// inner classes
 
-	class RoutingThread extends CancelableThread {
+	class RoutingThread extends CancellableThread {
 		List<MapNode> routeMarkers;
 		List<Position> positions;
 
@@ -309,7 +309,7 @@ public class MiniNaviApp implements ActionListener {
 		// System.setProperty(MiniNaviApp.MAP_CLASS_PROPERTY,
 		// "rl.osm.data.perst.PerstMap");
 		MiniNaviApp demo = new MiniNaviApp(args);
-		demo.getFrame().readMap(DataResource.getULMFileResource());
+		demo.getFrame().readMap(DataResource.getUlmFileResource());
 		// demo.getFrame().readMap(new File("maps/ulm.osm"));
 		demo.showFrame();
 	}

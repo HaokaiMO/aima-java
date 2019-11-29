@@ -1,10 +1,5 @@
 package aima.core.learning.reinforcement.agent;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-
 import aima.core.agent.Action;
 import aima.core.learning.reinforcement.PerceptStateReward;
 import aima.core.probability.mdp.ActionsFunction;
@@ -15,10 +10,12 @@ import aima.core.probability.mdp.impl.MDP;
 import aima.core.util.FrequencyCounter;
 import aima.core.util.datastructure.Pair;
 
+import java.util.*;
+
 /**
  * Artificial Intelligence A Modern Approach (3rd Edition): page 834.<br>
  * <br>
- * 
+ *
  * <pre>
  * function PASSIVE-ADP-AGENT(percept) returns an action
  *   inputs: percept, a percept indicating the current state s' and reward signal r'
@@ -28,7 +25,7 @@ import aima.core.util.datastructure.Pair;
  *               N<sub>sa</sub>, a table of frequencies for state-action pairs, initially zero
  *               N<sub>s'|sa</sub>, a table of outcome frequencies give state-action pairs, initially zero
  *               s, a, the previous state and action, initially null
- *               
+ *
  *   if s' is new then U[s'] <- r'; R[s'] <- r'
  *   if s is not null then
  *        increment N<sub>sa</sub>[s,a] and N<sub>s'|sa</sub>[s',s,a]
@@ -38,44 +35,44 @@ import aima.core.util.datastructure.Pair;
  *   if s'.TERMINAL? then s,a <- null else s,a <- s',&pi;[s']
  *   return a
  * </pre>
- * 
+ *
  * Figure 21.2 A passive reinforcement learning agent based on adaptive dynamic
  * programming. The POLICY-EVALUATION function solves the fixed-policy Bellman
  * equations, as described on page 657.
- * 
+ *
  * @param <S>
  *            the state type.
  * @param <A>
  *            the action type.
- * 
+ *
  * @author Ciaran O'Reilly
  * @author Ravi Mohan
- * 
+ * @author Ruediger Lunde
+ *
  */
-public class PassiveADPAgent<S, A extends Action> extends
-		ReinforcementAgent<S, A> {
+public class PassiveADPAgent<S, A extends Action> extends ReinforcementAgent<S, A> {
 	// persistent: &pi;, a fixed policy
-	private Map<S, A> pi = new HashMap<S, A>();
+	private Map<S, A> pi = new HashMap<>();
 	// mdp, an MDP with model P, rewards R, discount &gamma;
 	private MDP<S, A> mdp = null;
-	private Map<Pair<S, Pair<S, A>>, Double> P = new HashMap<Pair<S, Pair<S, A>>, Double>();
-	private Map<S, Double> R = new HashMap<S, Double>();
+	private Map<Pair<S, Pair<S, A>>, Double> P = new HashMap<>();
+	private Map<S, Double> R = new HashMap<>();
 	private PolicyEvaluation<S, A> policyEvaluation = null;
 	// U, a table of utilities, initially empty
-	private Map<S, Double> U = new HashMap<S, Double>();
+	private Map<S, Double> U = new HashMap<>();
 	// N<sub>sa</sub>, a table of frequencies for state-action pairs, initially
 	// zero
-	private FrequencyCounter<Pair<S, A>> Nsa = new FrequencyCounter<Pair<S, A>>();
+	private FrequencyCounter<Pair<S, A>> Nsa = new FrequencyCounter<>();
 	// N<sub>s'|sa</sub>, a table of outcome frequencies give state-action
 	// pairs, initially zero
-	private FrequencyCounter<Pair<S, Pair<S, A>>> NsDelta_sa = new FrequencyCounter<Pair<S, Pair<S, A>>>();
+	private FrequencyCounter<Pair<S, Pair<S, A>>> NsDelta_sa = new FrequencyCounter<>();
 	// s, a, the previous state and action, initially null
 	private S s = null;
 	private A a = null;
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param fixedPolicy
 	 *            &pi; a fixed policy.
 	 * @param states
@@ -91,32 +88,24 @@ public class PassiveADPAgent<S, A extends Action> extends
 			S initialState, ActionsFunction<S, A> actionsFunction,
 			PolicyEvaluation<S, A> policyEvaluation) {
 		this.pi.putAll(fixedPolicy);
-		this.mdp = new MDP<S, A>(states, initialState, actionsFunction,
-				new TransitionProbabilityFunction<S, A>() {
-					public double probability(S sDelta, S s, A a) {
-						Double p = P.get(new Pair<S, Pair<S, A>>(sDelta,
-								new Pair<S, A>(s, a)));
+		RewardFunction<S> rewardfn = (s) -> R.get(s);
 
-						return null == p ? 0.0 : p.doubleValue();
-					}
-				}, new RewardFunction<S>() {
-					public double reward(S s) {
-						return R.get(s);
-					}
-				});
+		this.mdp = new MDP<>(states, initialState, actionsFunction,
+				(sDelta, s, a) -> Optional.ofNullable(P.get(new Pair<>(sDelta, new Pair<>(s, a)))).orElse(0.0),
+				rewardfn);
 		this.policyEvaluation = policyEvaluation;
 	}
 
 	/**
 	 * Passive reinforcement learning based on adaptive dynamic programming.
-	 * 
+	 *
 	 * @param percept
 	 *            a percept indicating the current state s' and reward signal
 	 *            r'.
 	 * @return an action
 	 */
 	@Override
-	public A execute(PerceptStateReward<S> percept) {
+	public Optional<A> act(PerceptStateReward<S> percept) {
 		// if s' is new then U[s'] <- r'; R[s'] <- r'
 		S sDelta = percept.state();
 		double rDelta = percept.reward();
@@ -125,19 +114,18 @@ public class PassiveADPAgent<S, A extends Action> extends
 			R.put(sDelta, rDelta);
 		}
 		// if s is not null then
-		if (null != s) {
+		if (s != null) {
 			// increment N<sub>sa</sub>[s,a] and N<sub>s'|sa</sub>[s',s,a]
-			Pair<S, A> sa = new Pair<S, A>(s, a);
+			Pair<S, A> sa = new Pair<>(s, a);
 			Nsa.incrementFor(sa);
-			NsDelta_sa.incrementFor(new Pair<S, Pair<S, A>>(sDelta, sa));
+			NsDelta_sa.incrementFor(new Pair<>(sDelta, sa));
 			// for each t such that N<sub>s'|sa</sub>[t,s,a] is nonzero do
 			for (S t : mdp.states()) {
-				Pair<S, Pair<S, A>> t_sa = new Pair<S, Pair<S, A>>(t, sa);
-				if (0 != NsDelta_sa.getCount(t_sa)) {
+				Pair<S, Pair<S, A>> t_sa = new Pair<>(t, sa);
+				if (NsDelta_sa.getCount(t_sa) != 0) {
 					// P(t|s,a) <- N<sub>s'|sa</sub>[t,s,a] /
 					// N<sub>sa</sub>[s,a]
-					P.put(t_sa, NsDelta_sa.getCount(t_sa).doubleValue()
-							/ Nsa.getCount(sa).doubleValue());
+					P.put(t_sa, NsDelta_sa.getCount(t_sa).doubleValue() / Nsa.getCount(sa).doubleValue());
 				}
 			}
 		}
@@ -153,7 +141,7 @@ public class PassiveADPAgent<S, A extends Action> extends
 			a = pi.get(sDelta);
 		}
 		// return a
-		return a;
+		return Optional.ofNullable(a);
 	}
 
 	@Override
@@ -165,7 +153,7 @@ public class PassiveADPAgent<S, A extends Action> extends
 	public void reset() {
 		P.clear();
 		R.clear();
-		U = new HashMap<S, Double>();
+		U = new HashMap<>();
 		Nsa.clear();
 		NsDelta_sa.clear();
 		s = null;
@@ -176,11 +164,7 @@ public class PassiveADPAgent<S, A extends Action> extends
 	// PRIVATE METHODS
 	//
 	private boolean isTerminal(S s) {
-		boolean terminal = false;
-		if (0 == mdp.actions(s).size()) {
-			// No actions possible in state is considered terminal.
-			terminal = true;
-		}
-		return terminal;
+		// A state with no possible actions is considered terminal.
+		return mdp.actions(s).isEmpty();
 	}
 }

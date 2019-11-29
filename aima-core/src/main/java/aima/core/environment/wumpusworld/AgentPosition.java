@@ -14,16 +14,15 @@ public class AgentPosition {
 		FACING_SOUTH("FacingSouth"),
 		FACING_EAST("FacingEast"),
 		FACING_WEST("FacingWest");
-		
-		@Override
-		public String toString() {
-			return name;
+
+		public String getSymbol() {
+			return symbol;
 		}
 		
-		private final String name;
+		private final String symbol;
 		
-		Orientation(String name) {
-			this.name = name;
+		Orientation(String sym) {
+			symbol = sym;
 		}
 	}
 	
@@ -57,18 +56,15 @@ public class AgentPosition {
 
 	@Override
 	public String toString() {
-		return room.toString()+"->"+orientation;
+		return room.toString() + "->" + orientation.getSymbol();
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj != null && obj instanceof AgentPosition) {
-			AgentPosition othAgent = (AgentPosition) obj;
-			if ((getX() == othAgent.getX()) && (getY() == othAgent.getY()) && (orientation == othAgent.getOrientation()) ) {
-				return true;
-			} else {
-				return false;
-			}
+		if (obj != null && getClass() == obj.getClass()) {
+			AgentPosition other = (AgentPosition) obj;
+			return (getX() == other.getX()) && (getY() == other.getY())
+					&& (orientation == other.getOrientation());
 		}
 		return false;
 	}

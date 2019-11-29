@@ -1,16 +1,12 @@
 package aima.core.search.uninformed;
 
-import java.util.List;
-
-import aima.core.agent.Action;
-import aima.core.search.framework.Metrics;
-import aima.core.search.framework.Node;
-import aima.core.search.framework.NodeExpander;
-import aima.core.search.framework.SearchForActions;
-import aima.core.search.framework.SearchForStates;
-import aima.core.search.framework.SearchUtils;
+import aima.core.search.framework.*;
 import aima.core.search.framework.problem.Problem;
-import aima.core.util.CancelableThread;
+import aima.core.util.Tasks;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Artificial Intelligence A Modern Approach (3rd Edition): Figure 3.18, page
@@ -28,24 +24,24 @@ import aima.core.util.CancelableThread;
  * applies depth-limited search with increasing limits. It terminates when a
  * solution is found or if the depth- limited search returns failure, meaning
  * that no solution exists.
- * 
+ *
+ * @author Ruediger Lunde
  * @author Ravi Mohan
  * @author Ciaran O'Reilly
- * @author Ruediger Lunde
  */
-public class IterativeDeepeningSearch implements SearchForActions, SearchForStates {
+public class IterativeDeepeningSearch<S, A> implements SearchForActions<S, A>, SearchForStates<S, A> {
 	public static final String METRIC_NODES_EXPANDED = "nodesExpanded";
 	public static final String METRIC_PATH_COST = "pathCost";
 
-	private final NodeExpander nodeExpander;
+	private final NodeFactory<S, A> nodeFactory;
 	private final Metrics metrics;
 
 	public IterativeDeepeningSearch() {
-		this(new NodeExpander());
+		this(new NodeFactory<>());
 	}
 	
-	public IterativeDeepeningSearch(NodeExpander nodeExpander) {
-		this.nodeExpander = nodeExpander;
+	public IterativeDeepeningSearch(NodeFactory<S, A> nodeFactory) {
+		this.nodeFactory = nodeFactory;
 		this.metrics = new Metrics();
 	}
 	
@@ -53,38 +49,36 @@ public class IterativeDeepeningSearch implements SearchForActions, SearchForStat
 	// function ITERATIVE-DEEPENING-SEARCH(problem) returns a solution, or
 	// failure
 	@Override
-	public List<Action> findActions(Problem p) {
-		nodeExpander.useParentLinks(true);
-		Node node = findNode(p);
-		return node == null ? SearchUtils.failure() : SearchUtils.getSequenceOfActions(node);
+	public Optional<List<A>> findActions(Problem<S, A> p) {
+		nodeFactory.useParentLinks(true);
+		return SearchUtils.toActions(findNode(p));
 	}
 
 	@Override
-	public Object findState(Problem p) {
-		nodeExpander.useParentLinks(false);
-		Node node = findNode(p);
-		return node == null ? null : node.getState();
+	public Optional<S> findState(Problem<S, A> p) {
+		nodeFactory.useParentLinks(false);
+		return SearchUtils.toState(findNode(p));
 	}
-	
-	// Java 8: Use Optional<Node> as return value...
-	private Node findNode(Problem p) {
-		clearInstrumentation();
+
+	/**
+	 * Returns a solution node if a solution was found, empty if no solution is reachable or the task was cancelled
+	 * by the user.
+	 * @param p
+	 * @return
+	 */
+	private Optional<Node<S, A>> findNode(Problem<S, A> p) {
+		clearMetrics();
 		// for depth = 0 to infinity do
-		for (int i = 0; !CancelableThread.currIsCanceled(); i++) {
+		for (int i = 0; !Tasks.currIsCancelled(); i++) {
 			// result <- DEPTH-LIMITED-SEARCH(problem, depth)
-			DepthLimitedSearch dls = new DepthLimitedSearch(i, nodeExpander);
-			Node result = dls.findNode(p);
+			DepthLimitedSearch<S, A> dls = new DepthLimitedSearch<>(i, nodeFactory);
+			Optional<Node<S, A>> result = dls.findNode(p);
 			updateMetrics(dls.getMetrics());
 			// if result != cutoff then return result
-			if (result != DepthLimitedSearch.CUTOFF_NODE)
+			if (!dls.isCutoffResult(result))
 				return result;
 		}
-		return null;
-	}
-
-	@Override
-	public NodeExpander getNodeExpander() {
-		return nodeExpander;
+		return Optional.empty();
 	}
 	
 	@Override
@@ -92,17 +86,28 @@ public class IterativeDeepeningSearch implements SearchForActions, SearchForStat
 		return metrics;
 	}
 
-	/**
-	 * Sets the nodes expanded and path cost metrics to zero.
-	 */
-	private void clearInstrumentation() {
-		metrics.set(METRIC_NODES_EXPANDED, 0);
-		metrics.set(METRIC_PATH_COST, 0);
+	@Override
+	public void addNodeListener(Consumer<Node<S, A>> listener)  {
+		nodeFactory.addNodeListener(listener);
 	}
+
+	@Override
+	public boolean removeNodeListener(Consumer<Node<S, A>> listener) {
+		return nodeFactory.removeNodeListener(listener);
+	}
+
 
 	//
 	// PRIVATE METHODS
 	//
+
+	/**
+	 * Sets the nodes expanded and path cost metrics to zero.
+	 */
+	private void clearMetrics() {
+		metrics.set(METRIC_NODES_EXPANDED, 0);
+		metrics.set(METRIC_PATH_COST, 0);
+	}
 
 	private void updateMetrics(Metrics dlsMetrics) {
 		metrics.set(METRIC_NODES_EXPANDED,

@@ -1,108 +1,140 @@
 package aima.gui.fx.views;
 
-import java.util.List;
-
 import aima.core.agent.Action;
 import aima.core.agent.Agent;
 import aima.core.agent.Environment;
+import aima.core.agent.impl.AbstractEnvironment;
 import aima.core.environment.vacuum.VacuumEnvironment;
 import aima.core.environment.vacuum.VacuumEnvironment.LocationState;
-import javafx.geometry.Insets;
+import aima.core.environment.vacuum.VacuumEnvironmentState;
+import aima.core.environment.vacuum.VacuumPercept;
 import javafx.scene.Node;
-import javafx.scene.control.Label;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.ColumnConstraints;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Arc;
 import javafx.scene.shape.ArcType;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+
 /**
  * Environment view controller class which is specialized for vacuum
  * environments. It adds a vacuum environment state view to the text-based view
  * of the {@link SimpleEnvironmentViewCtrl}.
- * 
+ *
  * @author Ruediger Lunde
  */
-public class VacuumEnvironmentViewCtrl extends SimpleEnvironmentViewCtrl {
+public class VacuumEnvironmentViewCtrl extends AbstractGridEnvironmentViewCtrl<VacuumPercept, Action> {
 
-	protected GridPane envStateView;
-	protected List<String> locations;
-	private Agent agentInAction;
+    private Set<Agent> agentsInSuckState = new HashSet<>();
+    private Map<Agent, Double> agentOrientations = new HashMap<>();
+    private Function<Action, Double> actionToOrientationFn;
+    private Map<Agent, Arc> agentSymbols = new HashMap<>();
 
-	public VacuumEnvironmentViewCtrl(StackPane viewRoot) {
-		super(viewRoot);
-		envStateView = new GridPane();
-		envStateView.setHgap(20);
-		RowConstraints rowCons = new RowConstraints();
-		rowCons.setPercentHeight(100.0);
-		envStateView.getRowConstraints().add(rowCons);
-		envStateView.setPadding(new Insets(10, 10, 10, 10));
-		splitPane.getItems().add(0, envStateView);
-		splitPane.setDividerPosition(0, 0.7);
-		envStateView.setMinWidth(0.0);
-	}
+    public VacuumEnvironmentViewCtrl(StackPane viewRoot) {
+        this(viewRoot, action -> {
+            if (action == VacuumEnvironment.ACTION_MOVE_LEFT) return 270.0;
+            else if (action == VacuumEnvironment.ACTION_MOVE_RIGHT) return 90.0;
+            else return null;
+        });
+    }
 
-	@Override
-	public void initialize(Environment env) {
-		if (env instanceof VacuumEnvironment) {
-			this.locations = ((VacuumEnvironment) env).getLocations();
-			envStateView.getChildren().clear();
-			envStateView.getColumnConstraints().clear();
-			ColumnConstraints colCons = new ColumnConstraints();
-			colCons.setPercentWidth(100.0 / locations.size());
-			int i = 0;
-			for (String loc : locations) {
-				BorderPane pane = new BorderPane();
-				pane.setTop(new Label(loc));
-				pane.setStyle("-fx-background-color: white");
-				envStateView.add(pane, i++, 0);
-				envStateView.getColumnConstraints().add(colCons);
-			}
-		}
-		super.initialize(env);
-	}
+    /**
+     * Constructor with additional functional argument to control the rotation of the agent symbol.
+     * @param viewRoot the pane where the button grid is added
+     * @param actionToOrientationFn maps actions to direction values.
+     *                              Value interpretation: 0 = facing up, 90 = facing right, null = no change.
+     */
+    public VacuumEnvironmentViewCtrl(StackPane viewRoot, Function<Action, Double> actionToOrientationFn) {
+        super(viewRoot, env -> ((VacuumEnvironment) env).getXDimension(),
+                env -> ((VacuumEnvironment) env).getYDimension());
+        this.actionToOrientationFn = actionToOrientationFn;
+    }
 
-	@Override
-	public void agentActed(Agent agent, Action action, Environment source) {
-		agentInAction = (action == VacuumEnvironment.ACTION_SUCK) ? agent : null;
-		super.agentActed(agent, action, source);
-	}
+    @Override
+    public void initialize(AbstractEnvironment<? extends VacuumPercept, ? extends Action> env) {
+        agentsInSuckState.clear();
+        agentOrientations.clear();
+        agentSymbols.clear();
+        super.initialize(env);
+        VacuumEnvironment vEnv = (VacuumEnvironment) env;
+        for (String loc : vEnv.getLocations()) {
+            SquareButton btn = getSquareButton(vEnv.getX(loc), vEnv.getY(loc));
+            btn.getIdLabel().setText(loc);
+        }
+    }
 
-	@Override
-	protected void updateEnvStateView(Environment env) {
-		if (env instanceof VacuumEnvironment) {
-			VacuumEnvironment vEnv = (VacuumEnvironment) env;
-			for (String loc : locations) {
-				BorderPane pane = getLocPane(loc);
-				if (vEnv.getLocationState(loc).equals(LocationState.Dirty))
-					pane.setStyle("-fx-background-color: lightgrey");
-				else
-					pane.setStyle("-fx-background-color: white");
-				pane.setCenter(null);
-			}
-			for (Agent agent : vEnv.getAgents()) {
-				BorderPane pane = getLocPane(vEnv.getAgentLocation(agent));
-				pane.setCenter(createAgentRep(agent == agentInAction));
-			}
-		}
-	}
+    @Override
+    public void agentActed(Agent<?, ?> agent, VacuumPercept percept, Action action, Environment<?, ?> source) {
+        if (action == VacuumEnvironment.ACTION_SUCK)
+            agentsInSuckState.add(agent);
+        else
+            agentsInSuckState.remove(agent);
+        Double orientation = actionToOrientationFn.apply(action);
+        if (orientation != null)
+            agentOrientations.put(agent, orientation);
+        super.agentActed(agent, percept, action, source);
+    }
 
-	private BorderPane getLocPane(String location) {
-		int idx = locations.indexOf(location);
-		return (BorderPane) envStateView.getChildren().get(idx);
-	}
+    @Override
+    protected void update() {
+        VacuumEnvironment vEnv = ((VacuumEnvironment) env);
+        for (String loc : vEnv.getLocations()) {
+            SquareButton btn = getSquareButton(vEnv.getX(loc), vEnv.getY(loc));
+            if (vEnv.getLocationState(loc) == LocationState.Dirty)
+                btn.getLabel().setText("Dirty");
+            else if (vEnv.getLocationState(loc) == LocationState.Clean)
+                btn.getLabel().setText(""); // "Clean"
+            else
+                btn.getLabel().setText("X");
+            btn.getPane().getChildren().clear();
+        }
+        for (Agent agent : vEnv.getAgents()) {
+            String loc = vEnv.getAgentLocation(agent);
+            SquareButton btn = getSquareButton(vEnv.getX(loc), vEnv.getY(loc));
+            Double orientation = agentOrientations.get(agent);
+            if (orientation == null)
+                orientation = 90.0;
+            btn.getPane().getChildren().add(getAgentSymbol(agent, orientation));
+        }
+    }
 
-	protected Node createAgentRep(boolean suck) {
-		Arc arc = new Arc();
-		arc.setRadiusX(0.3 * envStateView.getWidth() / locations.size());
-		arc.setRadiusY(0.3 * envStateView.getWidth() / locations.size());
-		arc.setStartAngle(45.0f);
-		arc.setLength(suck ? 360.0f : 270.0f);
-		arc.setType(ArcType.ROUND);
-		arc.setFill(Color.RED);
-		return arc;
-	}
+    @Override
+    protected void onEdit(int x, int y) {
+        if (!isEditingEnabled)
+            perceptLabel.setText("Environment can only be edited after initialization.");
+        else {
+            VacuumEnvironment vEnv = (VacuumEnvironment) env;
+            VacuumEnvironmentState state = (VacuumEnvironmentState) vEnv.getCurrentState();
+            String loc = vEnv.getLocation(x, y);
+            if (state.getLocationState(loc) == LocationState.Clean)
+                state.setLocationState(loc, LocationState.Dirty);
+            else if (state.getLocationState(loc) == LocationState.Dirty && vEnv.getYDimension() > 2)
+                state.setLocationState(loc, null); // obstacle
+            else
+                state.setLocationState(loc, LocationState.Clean);
+            update();
+            perceptLabel.setText("");
+        }
+    }
+
+    private Node getAgentSymbol(Agent agent, double orientation) {
+        Arc result = agentSymbols.get(agent);
+        if (result == null) {
+            result = new Arc();
+            result.radiusXProperty().bind(squareSize.multiply(0.75 / 2));
+            result.radiusYProperty().bind(squareSize.multiply(0.75 / 2));
+            result.setStartAngle(135.0f);
+            result.setType(ArcType.ROUND);
+            result.setFill(Color.RED);
+            agentSymbols.put(agent, result);
+        }
+
+        result.setLength(agentsInSuckState.contains(agent) ? 360.0f : 270.0f);
+        result.setRotate(orientation);
+        return result;
+    }
 }

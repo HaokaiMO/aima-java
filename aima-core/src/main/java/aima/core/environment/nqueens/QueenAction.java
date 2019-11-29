@@ -8,7 +8,7 @@ import aima.core.util.datastructure.XYLocation;
  * is assumed. Therefore, only the end point needs to be specified.
  * 
  * @author Ravi Mohan
- * @author R. Lunde
+ * @author Ruediger Lunde
  */
 public class QueenAction extends DynamicAction {
 	public static final String PLACE_QUEEN = "placeQueenAt";
@@ -31,10 +31,10 @@ public class QueenAction extends DynamicAction {
 	}
 
 	public int getX() {
-		return getLocation().getXCoOrdinate();
+		return getLocation().getX();
 	}
 
 	public int getY() {
-		return getLocation().getYCoOrdinate();
+		return getLocation().getY();
 	}
 }

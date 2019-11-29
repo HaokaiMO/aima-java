@@ -21,23 +21,21 @@ public class NQueensBoard {
 	}
 
 	/**
-	 * X---> increases left to right with zero based index Y increases top to
-	 * bottom with zero based index | | V
+	 * X (first index, col) increases left to right with zero based index,
+	 * Y (second index, row) increases top to bottom with zero based index.
+	 * A queen at position (x, y) is indicated by value true.
 	 */
-	int[][] squares;
-
-	int size;
+	private boolean[][] squares;
 
 	/**
 	 * Creates a board with <code>size</code> rows and size columns. Column and
 	 * row indices start with 0.
 	 */
 	public NQueensBoard(int size) {
-		this.size = size;
-		squares = new int[size][size];
-		for (int i = 0; i < size; i++) {
-			for (int j = 0; j < size; j++) {
-				squares[i][j] = 0;
+		squares = new boolean[size][size];
+		for (int col = 0; col < size; col++) {
+			for (int row = 0; row < size; row++) {
+				squares[col][row] = false;
 			}
 		}
 	}
@@ -53,57 +51,50 @@ public class NQueensBoard {
 	public NQueensBoard(int size, Config config) {
 		this(size);
 		if (config == Config.QUEENS_IN_FIRST_ROW) {
-			for (int i = 0; i < size; i++)
-				addQueenAt(new XYLocation(i, 0));
+			for (int col = 0; col < size; col++)
+				addQueenAt(new XYLocation(col, 0));
 		} else if (config == Config.QUEEN_IN_EVERY_COL) {
 			Random r = new Random();
-			for (int i = 0; i < size; i++)
-				addQueenAt(new XYLocation(i, r.nextInt(size)));
-		}
-	}
-
-	public void clear() {
-		for (int i = 0; i < size; i++) {
-			for (int j = 0; j < size; j++) {
-				squares[i][j] = 0;
-			}
-		}
-	}
-
-	public void setBoard(List<XYLocation> al) {
-		clear();
-		for (int i = 0; i < al.size(); i++) {
-			addQueenAt(al.get(i));
+			for (int col = 0; col < size; col++)
+				addQueenAt(new XYLocation(col, r.nextInt(size)));
 		}
 	}
 
 	public int getSize() {
-		return size;
+		return squares.length;
+	}
+
+	public void clear() {
+		for (int col = 0; col < getSize(); col++) {
+			for (int row = 0; row < getSize(); row++) {
+				squares[col][row] = false;
+			}
+		}
+	}
+
+	public void setQueensAt(List<XYLocation> locations) {
+		clear();
+		locations.forEach(this::addQueenAt);
 	}
 
 	/** Column and row indices start with 0! */
 	public void addQueenAt(XYLocation l) {
-		if (!(queenExistsAt(l)))
-			squares[l.getXCoOrdinate()][l.getYCoOrdinate()] = 1;
+		squares[l.getX()][l.getY()] = true;
 	}
 
 	public void removeQueenFrom(XYLocation l) {
-		if (squares[l.getXCoOrdinate()][l.getYCoOrdinate()] == 1) {
-			squares[l.getXCoOrdinate()][l.getYCoOrdinate()] = 0;
-		}
+		squares[l.getX()][l.getY()] = false;
 	}
 
 	/**
 	 * Moves the queen in the specified column (x-value of <code>l</code>) to
 	 * the specified row (y-value of <code>l</code>). The action assumes a
 	 * complete-state formulation of the n-queens problem.
-	 * 
-	 * @param l
 	 */
 	public void moveQueenTo(XYLocation l) {
-		for (int i = 0; i < size; i++)
-			squares[l.getXCoOrdinate()][i] = 0;
-		squares[l.getXCoOrdinate()][l.getYCoOrdinate()] = 1;
+		for (int row = 0; row < getSize(); row++)
+			squares[l.getX()][row] = false;
+		squares[l.getX()][l.getY()] = true;
 	}
 
 	public void moveQueen(XYLocation from, XYLocation to) {
@@ -114,18 +105,18 @@ public class NQueensBoard {
 	}
 
 	public boolean queenExistsAt(XYLocation l) {
-		return (queenExistsAt(l.getXCoOrdinate(), l.getYCoOrdinate()));
+		return (queenExistsAt(l.getX(), l.getY()));
 	}
 
 	private boolean queenExistsAt(int x, int y) {
-		return (squares[x][y] == 1);
+		return squares[x][y];
 	}
 
 	public int getNumberOfQueensOnBoard() {
 		int count = 0;
-		for (int i = 0; i < size; i++) {
-			for (int j = 0; j < size; j++) {
-				if (squares[i][j] == 1)
+		for (int col = 0; col < getSize(); col++) {
+			for (int row = 0; row < getSize(); row++) {
+				if (squares[col][row])
 					count++;
 			}
 		}
@@ -133,11 +124,11 @@ public class NQueensBoard {
 	}
 
 	public List<XYLocation> getQueenPositions() {
-		ArrayList<XYLocation> result = new ArrayList<XYLocation>();
-		for (int i = 0; i < size; i++) {
-			for (int j = 0; j < size; j++) {
-				if (queenExistsAt(i, j))
-					result.add(new XYLocation(i, j));
+		ArrayList<XYLocation> result = new ArrayList<>();
+		for (int col = 0; col < getSize(); col++) {
+			for (int row = 0; row < getSize(); row++) {
+				if (queenExistsAt(col, row))
+					result.add(new XYLocation(col, row));
 			}
 		}
 		return result;
@@ -145,22 +136,18 @@ public class NQueensBoard {
 	}
 
 	public int getNumberOfAttackingPairs() {
-		int result = 0;
-		for (XYLocation location : getQueenPositions()) {
-			result += getNumberOfAttacksOn(location);
-		}
-		return result / 2;
+		return getQueenPositions().stream().mapToInt(this::getNumberOfAttacksOn).sum() / 2;
 	}
 
 	public int getNumberOfAttacksOn(XYLocation l) {
-		int x = l.getXCoOrdinate();
-		int y = l.getYCoOrdinate();
+		int x = l.getX();
+		int y = l.getY();
 		return numberOfHorizontalAttacksOn(x, y) + numberOfVerticalAttacksOn(x, y) + numberOfDiagonalAttacksOn(x, y);
 	}
 
 	public boolean isSquareUnderAttack(XYLocation l) {
-		int x = l.getXCoOrdinate();
-		int y = l.getYCoOrdinate();
+		int x = l.getX();
+		int y = l.getY();
 		return (isSquareHorizontallyAttacked(x, y) || isSquareVerticallyAttacked(x, y)
 				|| isSquareDiagonallyAttacked(x, y));
 	}
@@ -178,111 +165,91 @@ public class NQueensBoard {
 	}
 
 	private int numberOfHorizontalAttacksOn(int x, int y) {
-		int retVal = 0;
-		for (int i = 0; i < size; i++) {
-			if ((queenExistsAt(i, y)))
-				if (i != x)
-					retVal++;
+		int result = 0;
+		for (int col = 0; col < getSize(); col++) {
+			if ((queenExistsAt(col, y)))
+				if (col != x)
+					result++;
 		}
-		return retVal;
+		return result;
 	}
 
 	private int numberOfVerticalAttacksOn(int x, int y) {
-		int retVal = 0;
-		for (int j = 0; j < size; j++) {
-			if ((queenExistsAt(x, j)))
-				if (j != y)
-					retVal++;
+		int result = 0;
+		for (int row = 0; row < getSize(); row++) {
+			if ((queenExistsAt(x, row)))
+				if (row != y)
+					result++;
 		}
-		return retVal;
+		return result;
 	}
 
 	private int numberOfDiagonalAttacksOn(int x, int y) {
-		int retVal = 0;
-		int i;
-		int j;
+		int result = 0;
+		int col;
+		int row;
 		// forward up diagonal
-		for (i = (x + 1), j = (y - 1); (i < size && (j > -1)); i++, j--) {
-			if (queenExistsAt(i, j))
-				retVal++;
-		}
+		for (col = (x + 1), row = (y - 1); (col < getSize() && (row > -1)); col++, row--)
+			if (queenExistsAt(col, row))
+				result++;
+
 		// forward down diagonal
-		for (i = (x + 1), j = (y + 1); ((i < size) && (j < size)); i++, j++) {
-			if (queenExistsAt(i, j))
-				retVal++;
-		}
+		for (col = (x + 1), row = (y + 1); ((col < getSize()) && (row < getSize())); col++, row++)
+			if (queenExistsAt(col, row))
+				result++;
+
 		// backward up diagonal
-		for (i = (x - 1), j = (y - 1); ((i > -1) && (j > -1)); i--, j--) {
-			if (queenExistsAt(i, j))
-				retVal++;
-		}
+		for (col = (x - 1), row = (y - 1); ((col > -1) && (row > -1)); col--, row--)
+			if (queenExistsAt(col, row))
+				result++;
 
 		// backward down diagonal
-		for (i = (x - 1), j = (y + 1); ((i > -1) && (j < size)); i--, j++) {
-			if (queenExistsAt(i, j))
-				retVal++;
-		}
+		for (col = (x - 1), row = (y + 1); ((col > -1) && (row < getSize())); col--, row++)
+			if (queenExistsAt(col, row))
+				result++;
 
-		return retVal;
+		return result;
 	}
 
 	@Override
 	public int hashCode() {
-		List<XYLocation> locs = getQueenPositions();
-		int result = 17;
-		for (XYLocation loc : locs) {
-			result = 37 * loc.hashCode();
+		int result = 0;
+		for (int col = 0; col < getSize(); col++) {
+			for (int row = 0; row < getSize(); row++) {
+				if (queenExistsAt(col, row))
+					result = 17 * result + 7 * col + row;
+			}
 		}
 		return result;
 	}
 
 	@Override
 	public boolean equals(Object o) {
-		if (this == o)
-			return true;
-		if ((o == null) || (this.getClass() != o.getClass()))
-			return false;
-		NQueensBoard aBoard = (NQueensBoard) o;
-		boolean retVal = true;
-		List<XYLocation> locs = getQueenPositions();
-
-		for (XYLocation loc : locs) {
-			if (!(aBoard.queenExistsAt(loc)))
-				retVal = false;
-		}
-		return retVal;
-	}
-
-	public void print() {
-		System.out.println(getBoardPic());
-	}
-
-	public String getBoardPic() {
-		StringBuffer buffer = new StringBuffer();
-		for (int row = 0; (row < size); row++) { // row
-			for (int col = 0; (col < size); col++) { // col
-				if (queenExistsAt(col, row))
-					buffer.append(" Q ");
-				else
-					buffer.append(" - ");
+		if (o != null && getClass() == o.getClass()) {
+			NQueensBoard aBoard = (NQueensBoard) o;
+			for (int col = 0; col < getSize(); col++) {
+				for (int row = 0; row < getSize(); row++) {
+					if (queenExistsAt(col, row) != aBoard.queenExistsAt(col, row))
+						return false;
+				}
 			}
-			buffer.append("\n");
+			return true;
 		}
-		return buffer.toString();
+		return false;
 	}
 
 	@Override
 	public String toString() {
-		StringBuffer buf = new StringBuffer();
-		for (int row = 0; row < size; row++) { // rows
-			for (int col = 0; col < size; col++) { // columns
+		StringBuilder builder = new StringBuilder();
+		for (int row = 0; row < getSize(); row++) {
+			for (int col = 0; col < getSize(); col++) {
 				if (queenExistsAt(col, row))
-					buf.append('Q');
+					builder.append('Q');
 				else
-					buf.append('-');
+					builder.append('-');
 			}
-			buf.append("\n");
+			builder.append("\n");
 		}
-		return buf.toString();
+		return builder.toString();
 	}
 }

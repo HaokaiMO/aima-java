@@ -1,21 +1,21 @@
 package aima.test.core.unit.search.csp;
 
+import aima.core.search.csp.*;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import aima.core.search.csp.Assignment;
-import aima.core.search.csp.BacktrackingStrategy;
-import aima.core.search.csp.CSP;
-import aima.core.search.csp.MinConflictsStrategy;
 import aima.core.search.csp.examples.MapCSP;
+
+import java.util.Optional;
 
 /**
  * @author Ravi Mohan
+ * @author Ruediger Lunde
  * 
  */
 public class MapCSPTest {
-	private CSP csp;
+	private CSP<Variable, String> csp;
 
 	@Before
 	public void setUp() {
@@ -24,19 +24,19 @@ public class MapCSPTest {
 
 	@Test
 	public void testBackTrackingSearch() {
-		Assignment results = new BacktrackingStrategy().solve(csp);
-		Assert.assertNotNull(results);
-		Assert.assertEquals(MapCSP.GREEN, results.getAssignment(MapCSP.WA));
-		Assert.assertEquals(MapCSP.RED, results.getAssignment(MapCSP.NT));
-		Assert.assertEquals(MapCSP.BLUE, results.getAssignment(MapCSP.SA));
-		Assert.assertEquals(MapCSP.GREEN, results.getAssignment(MapCSP.Q));
-		Assert.assertEquals(MapCSP.RED, results.getAssignment(MapCSP.NSW));
-		Assert.assertEquals(MapCSP.GREEN, results.getAssignment(MapCSP.V));
-		Assert.assertEquals(MapCSP.RED, results.getAssignment(MapCSP.T));
+		Optional<Assignment<Variable, String>> results = new FlexibleBacktrackingSolver<Variable, String>().solve(csp);
+		Assert.assertTrue(results.isPresent());
+		Assert.assertEquals(MapCSP.GREEN, results.get().getValue(MapCSP.WA));
+		Assert.assertEquals(MapCSP.RED, results.get().getValue(MapCSP.NT));
+		Assert.assertEquals(MapCSP.BLUE, results.get().getValue(MapCSP.SA));
+		Assert.assertEquals(MapCSP.GREEN, results.get().getValue(MapCSP.Q));
+		Assert.assertEquals(MapCSP.RED, results.get().getValue(MapCSP.NSW));
+		Assert.assertEquals(MapCSP.GREEN, results.get().getValue(MapCSP.V));
+		Assert.assertEquals(MapCSP.RED, results.get().getValue(MapCSP.T));
 	}
 
 	@Test
 	public void testMCSearch() {
-		new MinConflictsStrategy(100).solve(csp);
+		new MinConflictsSolver<Variable, String>(100).solve(csp);
 	}
 }

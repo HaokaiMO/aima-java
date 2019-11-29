@@ -3,9 +3,8 @@ package aima.gui.fx.framework;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Optional;
 
-import aima.core.util.CancelableThread;
+import aima.core.util.Tasks;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.control.ScrollPane;
@@ -36,8 +35,8 @@ public class IntegratedAppPaneCtrl {
 	private MessagePaneCtrl messagePaneCtrl;
 
 	private DoubleProperty scale = new SimpleDoubleProperty();
-	private Optional<IntegrableApplication> currApp = Optional.empty();
-	private Optional<CancelableThread> currDemoThread = Optional.empty();
+	private IntegrableApplication currApp;
+	private Thread currDemoThread;
 
 	public IntegratedAppPaneCtrl() {
 		messageArea = new TextArea();
@@ -63,11 +62,11 @@ public class IntegratedAppPaneCtrl {
 	public void startApp(Class<? extends IntegrableApplication> appClass) {
 		stopRunningAppsAndDemo();
 		try {
-			currApp = Optional.of(appClass.newInstance());
-			Pane appPane = currApp.get().createRootPane();
+			currApp = appClass.newInstance();
+			Pane appPane = currApp.createRootPane();
 			pane.setCenter(appPane);
 			updateStageTitle();
-			currApp.get().initialize();
+			currApp.initialize();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -83,12 +82,10 @@ public class IntegratedAppPaneCtrl {
 		PrintStream pStream = messagePaneCtrl.getPrintStream();
 		System.setOut(pStream);
 		// System.setErr(messagePaneCtrl.getPrintStream());
-		currDemoThread = Optional.of(new CancelableThread(() -> {
+		currDemoThread = Tasks.executeInBackground(() -> {
 			startMain(demoClass);
 			pStream.flush();
-		}));
-		currDemoThread.get().setDaemon(true);
-		currDemoThread.get().start();
+		});
 	}
 
 	private void startMain(Class<?> demoClass) {
@@ -102,13 +99,13 @@ public class IntegratedAppPaneCtrl {
 	}
 
 	private void stopRunningAppsAndDemo() {
-		if (currApp.isPresent()) {
-			currApp.get().cleanup();
-			currApp = Optional.empty();
+		if (currApp != null) {
+			currApp.cleanup();
+			currApp = null;
 		}
-		if (currDemoThread.isPresent()) {
-			currDemoThread.get().cancel();
-			currDemoThread = Optional.empty();
+		if (currDemoThread != null) {
+			Tasks.cancel(currDemoThread);
+			currDemoThread = null;
 		}
 	}
 
@@ -117,6 +114,6 @@ public class IntegratedAppPaneCtrl {
 	 * and the current embedded application (if any).
 	 */
 	private void updateStageTitle() {
-		stage.setTitle(title + (currApp.isPresent() ? " - " + currApp.get().getTitle() : ""));
+		stage.setTitle(title + (currApp != null ? " - " + currApp.getTitle() : ""));
 	}
 }

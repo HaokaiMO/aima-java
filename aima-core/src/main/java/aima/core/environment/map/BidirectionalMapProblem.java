@@ -1,44 +1,38 @@
 package aima.core.environment.map;
 
 import aima.core.search.framework.problem.BidirectionalProblem;
-import aima.core.search.framework.problem.DefaultGoalTest;
-import aima.core.search.framework.problem.GoalTest;
+import aima.core.search.framework.problem.GeneralProblem;
 import aima.core.search.framework.problem.Problem;
 
+import java.util.function.Predicate;
+
 /**
- * @author Ciaran O'Reilly
+ * @author Ruediger Lunde
  * 
  */
-public class BidirectionalMapProblem extends Problem implements BidirectionalProblem {
+public class BidirectionalMapProblem extends GeneralProblem<String, MoveToAction>
+		implements BidirectionalProblem<String, MoveToAction> {
 
-	Map map;
-
-	Problem reverseProblem;
+	private Problem<String, MoveToAction> reverseProblem;
 
 	public BidirectionalMapProblem(Map map, String initialState, String goalState) {
-		this(map, initialState, goalState, new DefaultGoalTest(goalState));
+		this(map, initialState, goalState, Predicate.isEqual(goalState));
 	}
 
-	public BidirectionalMapProblem(Map map, String initialState, String goalState, GoalTest goalTest) {
-		super(initialState, MapFunctionFactory.getActionsFunction(map), MapFunctionFactory.getResultFunction(),
-				goalTest, new MapStepCostFunction(map));
+	public BidirectionalMapProblem(Map map, String initialState, String goalState, Predicate<String> goalTest) {
+		super(initialState, MapFunctions.createActionsFunction(map), MapFunctions.createResultFunction(),
+				goalTest, MapFunctions.createDistanceStepCostFunction(map));
 
-		this.map = map;
-
-		reverseProblem = new Problem(goalState, MapFunctionFactory.getReverseActionsFunction(map),
-				MapFunctionFactory.getResultFunction(), new DefaultGoalTest(initialState),
-				new MapStepCostFunction(map));
+		reverseProblem = new GeneralProblem<>(goalState, MapFunctions.createReverseActionsFunction(map),
+				MapFunctions.createResultFunction(), Predicate.isEqual(initialState),
+				MapFunctions.createDistanceStepCostFunction(map));
 	}
 
-	//
-	// START Interface BidrectionalProblem
-	public Problem getOriginalProblem() {
+	public Problem<String, MoveToAction> getOriginalProblem() {
 		return this;
 	}
 
-	public Problem getReverseProblem() {
+	public Problem<String, MoveToAction> getReverseProblem() {
 		return reverseProblem;
 	}
-	// END Interface BirectionalProblem
-	//
 }

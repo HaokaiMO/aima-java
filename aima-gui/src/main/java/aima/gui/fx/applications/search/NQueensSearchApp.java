@@ -1,8 +1,8 @@
 package aima.gui.fx.applications.search;
 
-import aima.core.environment.nqueens.AttackingPairsHeuristic;
 import aima.core.environment.nqueens.NQueensBoard;
 import aima.core.environment.nqueens.NQueensBoard.Config;
+import aima.core.environment.nqueens.NQueensFunctions;
 import aima.core.search.framework.Metrics;
 import aima.core.search.framework.qsearch.GraphSearch;
 import aima.core.search.framework.qsearch.TreeSearch;
@@ -13,8 +13,8 @@ import aima.core.search.uninformed.DepthFirstSearch;
 import aima.core.search.uninformed.IterativeDeepeningSearch;
 import aima.gui.fx.framework.IntegrableApplication;
 import aima.gui.fx.framework.Parameter;
-import aima.gui.fx.framework.SimulationPaneBuilder;
-import aima.gui.fx.framework.SimulationPaneCtrl;
+import aima.gui.fx.framework.TaskExecutionPaneBuilder;
+import aima.gui.fx.framework.TaskExecutionPaneCtrl;
 import aima.gui.fx.views.NQueensViewCtrl;
 import javafx.application.Platform;
 import javafx.scene.layout.BorderPane;
@@ -38,17 +38,17 @@ public class NQueensSearchApp extends IntegrableApplication {
 		launch(args);
 	}
 
-	public final static String PARAM_STRATEGY = "strategy";
-	public final static String PARAM_BOARD_SIZE = "boardSize";
-	public final static String PARAM_INIT_CONFIG = "initConfig";
+	private final static String PARAM_STRATEGY = "strategy";
+	private final static String PARAM_BOARD_SIZE = "boardSize";
+	private final static String PARAM_INIT_CONFIG = "initConfig";
 
 	private NQueensViewCtrl stateViewCtrl;
-	private SimulationPaneCtrl simPaneCtrl;
+	private TaskExecutionPaneCtrl taskPaneCtrl;
 	private NQueensSearchDemo experiment;
 
 	public NQueensSearchApp() {
 		experiment = new NQueensSearchDemo();
-		experiment.addProgressTracer(this::updateStateView);
+		experiment.addProgressTracker(this::updateStateView);
 	}
 
 	@Override
@@ -69,13 +69,13 @@ public class NQueensSearchApp extends IntegrableApplication {
 
 		List<Parameter> params = createParameters();
 
-		SimulationPaneBuilder builder = new SimulationPaneBuilder();
+		TaskExecutionPaneBuilder builder = new TaskExecutionPaneBuilder();
 		builder.defineParameters(params);
 		builder.defineStateView(stateView);
 		builder.defineInitMethod(this::initialize);
-		builder.defineSimMethod(this::simulate);
-		simPaneCtrl = builder.getResultFor(root);
-		simPaneCtrl.setParam(SimulationPaneCtrl.PARAM_SIM_SPEED, 1);
+		builder.defineTaskMethod(this::startExperiment);
+		taskPaneCtrl = builder.getResultFor(root);
+		taskPaneCtrl.setParam(TaskExecutionPaneCtrl.PARAM_EXEC_SPEED, 1);
 
 		return root;
 	}
@@ -98,13 +98,14 @@ public class NQueensSearchApp extends IntegrableApplication {
 	/** Displays the initialized board on the state view. */
 	@Override
 	public void initialize() {
-		experiment.setBoardSize(simPaneCtrl.getParamAsInt(PARAM_BOARD_SIZE));
-		Object strategy = simPaneCtrl.getParamValue(PARAM_STRATEGY);
+		experiment.setBoardSize(taskPaneCtrl.getParamAsInt(PARAM_BOARD_SIZE));
+		Object strategy = taskPaneCtrl.getParamValue(PARAM_STRATEGY);
 		Config config;
+		//noinspection SuspiciousMethodCalls
 		if (Arrays.asList("Depth-First Search (incremental)", "Breadth-First Search (incremental)", "Genetic Algorithm")
                 .contains(strategy))
 			config = Config.EMPTY;
-		else if (simPaneCtrl.getParamValue(PARAM_INIT_CONFIG).equals("Random"))
+		else if (taskPaneCtrl.getParamValue(PARAM_INIT_CONFIG).equals("Random"))
 			config = Config.QUEEN_IN_EVERY_COL;
 		else
 			config = Config.QUEENS_IN_FIRST_ROW;
@@ -114,28 +115,30 @@ public class NQueensSearchApp extends IntegrableApplication {
 
 	@Override
 	public void cleanup() {
-		simPaneCtrl.cancelSimulation();
+		taskPaneCtrl.cancelExecution();
 	}
 
 	/** Starts the experiment. */
-	public void simulate() {
-		Object strategy = simPaneCtrl.getParamValue(PARAM_STRATEGY);
+	public void startExperiment() {
+		Object strategy = taskPaneCtrl.getParamValue(PARAM_STRATEGY);
 		if (strategy.equals("Depth-First Search (incremental)"))
-			experiment.startExperiment(new DepthFirstSearch(new TreeSearch()));
+			experiment.startExperiment(new DepthFirstSearch<>(new TreeSearch<>()));
 		else if (strategy.equals("Breadth-First Search (incremental)"))
-			experiment.startExperiment(new BreadthFirstSearch(new TreeSearch()));
+			experiment.startExperiment(new BreadthFirstSearch<>(new TreeSearch<>()));
 		else if (strategy.equals("Iterative Deepening Search"))
-			experiment.startExperiment(new IterativeDeepeningSearch());
+			experiment.startExperiment(new IterativeDeepeningSearch<>());
 		else if (strategy.equals("Greedy Best-First Search (attacking pair heuristic)"))
-			experiment.startExperiment(new GreedyBestFirstSearch(new GraphSearch(), new AttackingPairsHeuristic()));
+			experiment.startExperiment(new GreedyBestFirstSearch<>(new GraphSearch<>(),
+					NQueensFunctions::getNumberOfAttackingPairs));
         else if (strategy.equals("A* search (attacking pair heuristic)"))
-            experiment.startExperiment(new AStarSearch(new GraphSearch(), new AttackingPairsHeuristic()));
+            experiment.startExperiment(new AStarSearch<>(new GraphSearch<>(),
+					NQueensFunctions::getNumberOfAttackingPairs));
 		else if (strategy.equals("Hill Climbing"))
 			experiment.startHillClimbingExperiment();
 		else if (strategy.equals("Simulated Annealing"))
 			experiment.startSimulatedAnnealingExperiment();
 		else if (strategy.equals("Genetic Algorithm"))
-			experiment.startGenAlgoExperiment(simPaneCtrl.getParamValue(PARAM_INIT_CONFIG).equals("Random"));
+			experiment.startGenAlgoExperiment(taskPaneCtrl.getParamValue(PARAM_INIT_CONFIG).equals("Random"));
 	}
 
 	/**
@@ -144,7 +147,7 @@ public class NQueensSearchApp extends IntegrableApplication {
 	 */
 	private void updateStateView(NQueensBoard board, Metrics metrics) {
 		Platform.runLater(() -> updateStateViewLater(board, metrics));
-		simPaneCtrl.waitAfterStep();
+		taskPaneCtrl.waitAfterStep();
 	}
 
 	/**
@@ -152,6 +155,6 @@ public class NQueensSearchApp extends IntegrableApplication {
 	 */
 	private void updateStateViewLater(NQueensBoard board, Metrics metrics) {
 		stateViewCtrl.update(board);
-		simPaneCtrl.setStatus(metrics.toString());
+		taskPaneCtrl.setStatus(metrics.toString());
 	}
 }

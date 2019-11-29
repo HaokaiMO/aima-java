@@ -19,11 +19,22 @@ public class TicTacToeState implements Cloneable {
 	public static final String X = "X";
 	public static final String EMPTY = "-";
 	//
-	private String[] board = new String[] { EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
-			EMPTY, EMPTY, EMPTY, EMPTY };
+	private String[] board;
 
-	private String playerToMove = X;
+	private String playerToMove;
 	private double utility = -1; // 1: win for X, 0: win for O, 0.5: draw
+	
+	public TicTacToeState(){
+		this.board = new String[] { EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY };
+		playerToMove = X;
+	}
+	
+	public TicTacToeState(String[] board, String playerToMove){
+		this.board = board;
+		this.playerToMove = (Objects.equals(playerToMove, X) ? O : X);
+		analyzeUtility();
+		this.playerToMove = playerToMove;
+	}
 
 	public String getPlayerToMove() {
 		return playerToMove;
@@ -42,7 +53,7 @@ public class TicTacToeState implements Cloneable {
 	}
 
 	public void mark(XYLocation action) {
-		mark(action.getXCoOrdinate(), action.getYCoOrdinate());
+		mark(action.getX(), action.getY());
 	}
 
 	public void mark(int col, int row) {
@@ -138,9 +149,8 @@ public class TicTacToeState implements Cloneable {
 		if (anObj != null && anObj.getClass() == getClass()) {
 			TicTacToeState anotherState = (TicTacToeState) anObj;
 			for (int i = 0; i < 9; i++) {
-				if (!Objects.equals(board[i], anotherState.board[i])) {
+				if (!Objects.equals(board[i], anotherState.board[i]))
 					return false;
-				}
 			}
 			return true;
 		}
@@ -155,14 +165,14 @@ public class TicTacToeState implements Cloneable {
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer();
+		StringBuilder builder = new StringBuilder();
 		for (int row = 0; row < 3; row++) {
 			for (int col = 0; col < 3; col++) {
-				buffer.append(getValue(col, row)).append(" ");
+				builder.append(getValue(col, row)).append(" ");
 			}
-			buffer.append("\n");
+			builder.append("\n");
 		}
-		return buffer.toString();
+		return builder.toString();
 	}
 
 	//

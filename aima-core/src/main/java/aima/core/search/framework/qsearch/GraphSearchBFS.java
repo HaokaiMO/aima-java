@@ -1,11 +1,12 @@
 package aima.core.search.framework.qsearch;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 
 import aima.core.search.framework.Node;
-import aima.core.search.framework.NodeExpander;
+import aima.core.search.framework.NodeFactory;
 import aima.core.search.framework.problem.Problem;
 
 /**
@@ -28,26 +29,29 @@ import aima.core.search.framework.problem.Problem;
  * Figure 3.7 An informal description of the general graph-search algorithm.
  * <br>
  * This implementation is based on the template method
- * {@link QueueSearch#findNode(Problem, Queue)} of the superclass and
+ * {@link TreeSearch#findNode(Problem, Queue)} of the superclass and
  * provides implementations for the needed primitive operations. It is the most
- * efficient variant of graph search for breadth first search. But don't expect
+ * efficient variant of graph search for breadth first. But don't expect
  * shortest paths in combination with priority queue frontiers.
- * 
+ *
+ * @param <S> The type used to represent states
+ * @param <A> The type of the actions to be used to navigate through the state space
+ *
+ * @author Ruediger Lunde
  * @author Ravi Mohan
  * @author Ciaran O'Reilly
- * @author Ruediger Lunde
  */
-public class GraphSearchBFS extends QueueSearch {
+public class GraphSearchBFS<S, A> extends TreeSearch<S, A> {
 
-	private Set<Object> explored = new HashSet<Object>();
-	private Set<Object> frontierStates = new HashSet<Object>();
+	private Set<S> explored = new HashSet<>();
+	private Set<S> frontierStates = new HashSet<>();
 
 	public GraphSearchBFS() {
-		this(new NodeExpander());
+		this(new NodeFactory<>());
 	}
 
-	public GraphSearchBFS(NodeExpander nodeExpander) {
-		super(nodeExpander);
+	public GraphSearchBFS(NodeFactory<S, A> nodeFactory) {
+		super(nodeFactory);
 	}
 	
 	
@@ -56,8 +60,8 @@ public class GraphSearchBFS extends QueueSearch {
 	 * <code>QueSearch</code>
 	 */
 	@Override
-	public Node findNode(Problem problem, Queue<Node> frontier) {
-		// Initialize the explored set to be empty
+	public Optional<Node<S, A>> findNode(Problem<S, A> problem, Queue<Node<S, A>> frontier) {
+		// initialize the explored set to be empty
 		explored.clear();
 		frontierStates.clear();
 		return super.findNode(problem, frontier);
@@ -68,7 +72,7 @@ public class GraphSearchBFS extends QueueSearch {
 	 * is not already a frontier state and was not yet explored.
 	 */
 	@Override
-	protected void addToFrontier(Node node) {
+	protected void addToFrontier(Node<S, A> node) {
 		if (!explored.contains(node.getState()) && !frontierStates.contains(node.getState())) {
 			frontier.add(node);
 			frontierStates.add(node.getState());
@@ -83,8 +87,8 @@ public class GraphSearchBFS extends QueueSearch {
 	 * @return the node at the head of the frontier.
 	 */
 	@Override
-	protected Node removeFromFrontier() {
-		Node result = frontier.remove();
+	protected Node<S, A> removeFromFrontier() {
+		Node<S, A> result = frontier.remove();
 		explored.add(result.getState());
 		frontierStates.remove(result.getState());
 		updateMetrics(frontier.size());

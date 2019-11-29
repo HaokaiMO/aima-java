@@ -1,40 +1,37 @@
 package aima.test.core.unit.search.uninformed;
 
-import java.util.List;
-
-import org.junit.Assert;
-import org.junit.Test;
-
 import aima.core.agent.Action;
-import aima.core.environment.map.ExtendableMap;
-import aima.core.environment.map.Map;
-import aima.core.environment.map.MapFunctionFactory;
-import aima.core.environment.map.MapStepCostFunction;
-import aima.core.environment.map.SimplifiedRoadMapOfPartOfRomania;
+import aima.core.environment.map.*;
 import aima.core.environment.nqueens.NQueensBoard;
-import aima.core.environment.nqueens.NQueensFunctionFactory;
-import aima.core.environment.nqueens.NQueensGoalTest;
-import aima.core.search.framework.SearchAgent;
+import aima.core.environment.nqueens.NQueensFunctions;
+import aima.core.environment.nqueens.QueenAction;
+import aima.core.search.agent.SearchAgent;
 import aima.core.search.framework.SearchForActions;
-import aima.core.search.framework.problem.DefaultGoalTest;
+import aima.core.search.framework.problem.GeneralProblem;
 import aima.core.search.framework.problem.Problem;
 import aima.core.search.framework.qsearch.QueueSearch;
 import aima.core.search.uninformed.UniformCostSearch;
+import org.junit.Assert;
+import org.junit.Test;
+
+import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * @author Ciaran O'Reilly
+ * @author Ruediger Lunde
  * 
  */
 public class UniformCostSearchTest {
 
 	@Test
 	public void testUniformCostSuccesfulSearch() throws Exception {
-		Problem problem = new Problem(new NQueensBoard(8), NQueensFunctionFactory.getIActionsFunction(),
-				NQueensFunctionFactory.getResultFunction(), new NQueensGoalTest());
-		SearchForActions search = new UniformCostSearch();
-		SearchAgent agent = new SearchAgent(problem, search);
+		Problem<NQueensBoard, QueenAction> problem = new GeneralProblem<>(new NQueensBoard(8),
+				NQueensFunctions::getIFActions, NQueensFunctions::getResult, NQueensFunctions::testGoal);
+		SearchForActions<NQueensBoard, QueenAction> search = new UniformCostSearch<>();
+		SearchAgent<Object, NQueensBoard, QueenAction> agent = new SearchAgent<>(problem, search);
 
-		List<Action> actions = agent.getActions();
+		List<QueenAction> actions = agent.getActions();
 
 		Assert.assertEquals(8, actions.size());
 
@@ -45,12 +42,12 @@ public class UniformCostSearchTest {
 
 	@Test
 	public void testUniformCostUnSuccesfulSearch() throws Exception {
-		Problem problem = new Problem(new NQueensBoard(3), NQueensFunctionFactory.getIActionsFunction(),
-				NQueensFunctionFactory.getResultFunction(), new NQueensGoalTest());
-		SearchForActions search = new UniformCostSearch();
-		SearchAgent agent = new SearchAgent(problem, search);
+		Problem<NQueensBoard, QueenAction> problem = new GeneralProblem<>(new NQueensBoard(3),
+				NQueensFunctions::getIFActions, NQueensFunctions::getResult, NQueensFunctions::testGoal);
+		SearchForActions<NQueensBoard, QueenAction> search = new UniformCostSearch<>();
+		SearchAgent<Object, NQueensBoard, QueenAction> agent = new SearchAgent<>(problem, search);
 
-		List<Action> actions = agent.getActions();
+		List<QueenAction> actions = agent.getActions();
 
 		Assert.assertEquals(0, actions.size());
 
@@ -62,18 +59,19 @@ public class UniformCostSearchTest {
 
 	@Test
 	public void testAIMA3eFigure3_15() throws Exception {
-		Map romaniaMap = new SimplifiedRoadMapOfPartOfRomania();
-		Problem problem = new Problem(SimplifiedRoadMapOfPartOfRomania.SIBIU,
-				MapFunctionFactory.getActionsFunction(romaniaMap), MapFunctionFactory.getResultFunction(),
-				new DefaultGoalTest(SimplifiedRoadMapOfPartOfRomania.BUCHAREST), new MapStepCostFunction(romaniaMap));
+		Map romaniaMap = new SimplifiedRoadMapOfRomania();
+		Problem<String, MoveToAction> problem = new GeneralProblem<>(SimplifiedRoadMapOfRomania.SIBIU,
+				MapFunctions.createActionsFunction(romaniaMap), MapFunctions.createResultFunction(),
+				Predicate.isEqual(SimplifiedRoadMapOfRomania.BUCHAREST),
+				MapFunctions.createDistanceStepCostFunction(romaniaMap));
 
-		SearchForActions search = new UniformCostSearch();
-		SearchAgent agent = new SearchAgent(problem, search);
+		SearchForActions<String, MoveToAction> search = new UniformCostSearch<>();
+		SearchAgent<Object, String, MoveToAction> agent = new SearchAgent<>(problem, search);
 
-		List<Action> actions = agent.getActions();
+		List<MoveToAction> actions = agent.getActions();
 
 		Assert.assertEquals(
-				"[Action[name==moveTo, location==RimnicuVilcea], Action[name==moveTo, location==Pitesti], Action[name==moveTo, location==Bucharest]]",
+				"[Action[name=moveTo, location=RimnicuVilcea], Action[name=moveTo, location=Pitesti], Action[name=moveTo, location=Bucharest]]",
 				actions.toString());
 		Assert.assertEquals("278.0", search.getMetrics().get(QueueSearch.METRIC_PATH_COST));
 	}
@@ -88,16 +86,17 @@ public class UniformCostSearchTest {
 		map.addBidirectionalLink("c", "e", 1.0);
 		map.addBidirectionalLink("d", "goal", 1.0);
 		map.addBidirectionalLink("e", "goal", 5.0);
-		Problem problem = new Problem("start", MapFunctionFactory.getActionsFunction(map),
-				MapFunctionFactory.getResultFunction(), new DefaultGoalTest("goal"), new MapStepCostFunction(map));
+		Problem<String, MoveToAction> problem = new GeneralProblem<>("start", MapFunctions.createActionsFunction(map),
+				MapFunctions.createResultFunction(), Predicate.isEqual("goal"),
+				MapFunctions.createDistanceStepCostFunction(map));
 
-		SearchForActions search = new UniformCostSearch();
-		SearchAgent agent = new SearchAgent(problem, search);
+		SearchForActions<String, MoveToAction> search = new UniformCostSearch<>();
+		SearchAgent<Action, String, MoveToAction> agent = new SearchAgent<>(problem, search);
 
-		List<Action> actions = agent.getActions();
+		List<MoveToAction> actions = agent.getActions();
 
 		Assert.assertEquals(
-				"[Action[name==moveTo, location==b], Action[name==moveTo, location==d], Action[name==moveTo, location==goal]]",
+				"[Action[name=moveTo, location=b], Action[name=moveTo, location=d], Action[name=moveTo, location=goal]]",
 				actions.toString());
 		Assert.assertEquals("5.5", search.getMetrics().get(QueueSearch.METRIC_PATH_COST));
 	}

@@ -12,6 +12,8 @@ import javafx.scene.layout.StackPane;
 import java.util.ArrayList;
 import java.util.List;
 
+import static javafx.scene.input.MouseButton.SECONDARY;
+
 /**
  * Provides a view for Sudoku puzzles. Digit positions are specified by column and row indices between 1 (top / left)
  * and 9 (bottom / right). Fixed digits are shown in brackets.
@@ -20,8 +22,7 @@ import java.util.List;
  */
 public class SudokuViewCtrl {
 
-    private GridPane gridPane = new GridPane();
-    private List<ComboBox<String>> combos = new ArrayList(81);
+    private List<ComboBox<String>> combos = new ArrayList<>(81);
 
     /**
      * Adds a grid pane with combo boxes to the provided root pane and returns
@@ -29,6 +30,7 @@ public class SudokuViewCtrl {
      */
     public SudokuViewCtrl(StackPane viewRoot) {
         // create grid layout
+        GridPane gridPane = new GridPane();
         viewRoot.getChildren().add(gridPane);
         viewRoot.setAlignment(Pos.BOTTOM_CENTER);
         gridPane.maxWidthProperty().bind(viewRoot.widthProperty().subtract(20));
@@ -59,6 +61,7 @@ public class SudokuViewCtrl {
             combos.add(combo);
             gridPane.add(combo, i % 9, i / 9);
         }
+        gridPane.setOnMousePressed((ev) -> { if (ev.getButton() == SECONDARY) clear(false); });
     }
 
     public void clear(boolean allDigits) {
@@ -81,6 +84,7 @@ public class SudokuViewCtrl {
         getCombo(col, row).getSelectionModel().select(digit + 9);
     }
 
+    /** Return a digit between 1 and 9 or -1 if no value has been selected yet. */
     public int getDigit(int col, int row) {
         int selIdx = getCombo(col, row).getSelectionModel().getSelectedIndex();
         if (selIdx == 0)

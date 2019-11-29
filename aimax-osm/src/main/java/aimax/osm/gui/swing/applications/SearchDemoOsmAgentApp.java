@@ -4,14 +4,16 @@ import java.util.HashSet;
 import java.util.List;
 
 import aima.core.agent.Agent;
+import aima.core.agent.impl.DynamicPercept;
 import aima.core.environment.map.BidirectionalMapProblem;
+import aima.core.environment.map.MapFunctions;
+import aima.core.environment.map.MoveToAction;
 import aima.core.environment.map.SimpleMapAgent;
-import aima.core.environment.map.MapFunctionFactory;
 import aima.core.search.framework.Node;
-import aima.core.search.framework.NodeExpander.NodeListener;
+import aima.core.search.framework.problem.GeneralProblem;
 import aima.core.search.framework.problem.Problem;
 import aima.core.search.online.LRTAStarAgent;
-import aima.core.search.online.OnlineSearchProblem;
+import aima.core.search.framework.problem.OnlineSearchProblem;
 import aima.core.util.math.geom.shapes.Point2D;
 import aima.gui.swing.applications.agent.map.MapAgentFrame;
 import aima.gui.swing.framework.AgentAppController;
@@ -44,7 +46,7 @@ public class SearchDemoOsmAgentApp extends OsmAgentApp {
 	 * search nodes have been expanded during the last search. Quick and dirty
 	 * solution...
 	 */
-	static final HashSet<Object> visitedStates = new HashSet<Object>();
+	private static final HashSet<Object> visitedStates = new HashSet<>();
 
 	/** Creates an <code>OsmAgentView</code>. */
 	@Override
@@ -55,12 +57,12 @@ public class SearchDemoOsmAgentApp extends OsmAgentApp {
 	}
 
 	@Override
-	public AgentAppFrame createFrame() {
+	public AgentAppFrame<DynamicPercept, MoveToAction> createFrame() {
 		return new SDFrame();
 	}
 
 	@Override
-	public AgentAppController createController() {
+	public AgentAppController<DynamicPercept, MoveToAction> createController() {
 		return new SDController(map);
 	}
 
@@ -111,23 +113,19 @@ public class SearchDemoOsmAgentApp extends OsmAgentApp {
 			heuristic = createHeuristic(state.getIndex(MapAgentFrame.HEURISTIC_SEL), locs[1]);
 			search = SearchFactory.getInstance().createSearch(state.getIndex(MapAgentFrame.SEARCH_SEL),
 					state.getIndex(MapAgentFrame.Q_SEARCH_IMPL_SEL), heuristic);
-			search.getNodeExpander().addNodeListener(new NodeListener() {
-				@Override
-				public void onNodeExpanded(Node node) {
-					visitedStates.add(node.getState());
-				}
-			});
+			search.addNodeListener((node) -> visitedStates.add(node.getState()));
 			
-			Agent agent = null;
+			Agent<DynamicPercept, MoveToAction> agent = null;
 			switch (state.getIndex(MapAgentFrame.AGENT_SEL)) {
 			case 0:
-				agent = new SimpleMapAgent(map, env, search, new String[] { locs[1] });
+				agent = new SimpleMapAgent(map, search, locs[1]).setNotifier(env);
 				break;
 			case 1:
-				Problem p = new BidirectionalMapProblem(map, null, locs[1]);
-				OnlineSearchProblem osp = new OnlineSearchProblem(p.getActionsFunction(), p.getGoalTest(),
-						p.getStepCostFunction());
-				agent = new LRTAStarAgent(osp, MapFunctionFactory.getPerceptToStateFunction(), heuristic);
+				Problem<String, MoveToAction> p = new BidirectionalMapProblem(map, null, locs[1]);
+				OnlineSearchProblem<String, MoveToAction> osp = new GeneralProblem<>
+						(null, p::getActions, null, p::testGoal, p::getStepCosts);
+				agent = new LRTAStarAgent<>(osp, MapFunctions.createPerceptToStateFunction(),
+						s -> heuristic.applyAsDouble(new Node<>(s)));
 				break;
 			}
 			env.addAgent(agent, locs[0]);
@@ -173,7 +171,7 @@ public class SearchDemoOsmAgentApp extends OsmAgentApp {
 		// Logger.getLogger("").getHandlers()[0].setLevel(Level.FINE);
 
 		SearchDemoOsmAgentApp demo = new SearchDemoOsmAgentApp();
-		demo.readMap(DataResource.getULMFileResource());
+		demo.readMap(DataResource.getUlmFileResource());
 		demo.startApplication();
 	}
 }

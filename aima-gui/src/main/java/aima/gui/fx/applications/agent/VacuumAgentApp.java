@@ -1,32 +1,23 @@
 package aima.gui.fx.applications.agent;
 
-import java.util.Arrays;
-import java.util.List;
-
-import aima.core.agent.impl.AbstractAgent;
-import aima.core.environment.vacuum.FullyObservableVacuumEnvironmentPerceptToStateFunction;
-import aima.core.environment.vacuum.ModelBasedReflexVacuumAgent;
-import aima.core.environment.vacuum.NondeterministicVacuumAgent;
-import aima.core.environment.vacuum.NondeterministicVacuumEnvironment;
-import aima.core.environment.vacuum.ReflexVacuumAgent;
-import aima.core.environment.vacuum.SimpleReflexVacuumAgent;
-import aima.core.environment.vacuum.TableDrivenVacuumAgent;
-import aima.core.environment.vacuum.VacuumEnvironment;
-import aima.core.environment.vacuum.VacuumWorldActions;
-import aima.core.environment.vacuum.VacuumWorldGoalTest;
-import aima.core.environment.vacuum.VacuumWorldResults;
-import aima.core.search.framework.problem.DefaultStepCostFunction;
+import aima.core.agent.Action;
+import aima.core.agent.impl.SimpleAgent;
+import aima.core.environment.vacuum.*;
+import aima.core.search.agent.NondeterministicSearchAgent;
 import aima.core.search.nondeterministic.NondeterministicProblem;
-import aima.core.util.CancelableThread;
+import aima.core.util.Tasks;
 import aima.gui.fx.framework.IntegrableApplication;
 import aima.gui.fx.framework.Parameter;
-import aima.gui.fx.framework.SimulationPaneBuilder;
-import aima.gui.fx.framework.SimulationPaneCtrl;
+import aima.gui.fx.framework.TaskExecutionPaneBuilder;
+import aima.gui.fx.framework.TaskExecutionPaneCtrl;
 import aima.gui.fx.views.SimpleEnvironmentViewCtrl;
 import aima.gui.fx.views.VacuumEnvironmentViewCtrl;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Integrable application which demonstrates how different kinds of vacuum
@@ -43,14 +34,10 @@ public class VacuumAgentApp extends IntegrableApplication {
     public final static String PARAM_ENV = "environment";
     public final static String PARAM_AGENT = "agent";
 
-    private SimulationPaneCtrl simPaneCtrl;
+    private TaskExecutionPaneCtrl taskPaneCtrl;
     private SimpleEnvironmentViewCtrl envViewCtrl;
     protected VacuumEnvironment env = null;
-    protected AbstractAgent agent = null;
-
-    public VacuumAgentApp() {
-
-    }
+    protected SimpleAgent<VacuumPercept, Action> agent = null;
 
     @Override
     public String getTitle() {
@@ -66,42 +53,54 @@ public class VacuumAgentApp extends IntegrableApplication {
         BorderPane root = new BorderPane();
 
         StackPane envView = new StackPane();
-        envViewCtrl = new VacuumEnvironmentViewCtrl(envView);
+		envViewCtrl = new VacuumEnvironmentViewCtrl(envView, action -> {
+			if (action == VacuumEnvironment.ACTION_MOVE_LEFT) return 270.0;
+			else if (action == VacuumEnvironment.ACTION_MOVE_RIGHT) return 90.0;
+			else if (action == MazeVacuumEnvironment.ACTION_MOVE_UP) return 0.0;
+			else if (action == MazeVacuumEnvironment.ACTION_MOVE_DOWN) return 180.0;
+			else return null;
+		});
 
         List<Parameter> params = createParameters();
 
-        SimulationPaneBuilder builder = new SimulationPaneBuilder();
+        TaskExecutionPaneBuilder builder = new TaskExecutionPaneBuilder();
         builder.defineParameters(params);
         builder.defineStateView(envView);
         builder.defineInitMethod(this::initialize);
-        builder.defineSimMethod(this::simulate);
-        simPaneCtrl = builder.getResultFor(root);
+        builder.defineTaskMethod(this::startExperiment);
+        taskPaneCtrl = builder.getResultFor(root);
 
         return root;
     }
 
     protected List<Parameter> createParameters() {
-        Parameter p1 = new Parameter(PARAM_ENV, "A/B Deterministic Environment", "A/B Non-Deterministic Environment");
+        Parameter p1 = new Parameter(PARAM_ENV, "A/B Deterministic Environment",
+                "A/B Non-Deterministic Environment", "Maze Environment");
         Parameter p2 = new Parameter(PARAM_AGENT, "TableDrivenVacuumAgent", "ReflexVacuumAgent",
-                "SimpleReflexVacuumAgent", "ModelBasedReflexVacuumAgent", "NondeterministicVacuumAgent");
+                "SimpleReflexVacuumAgent", "ModelBasedReflexVacuumAgent", "NondeterministicVacuumAgent",
+                "RandomWalkVacuumAgent");
         return Arrays.asList(p1, p2);
     }
 
     /**
      * Is called after each parameter selection change.
      */
+    @SuppressWarnings("unchecked")
     @Override
     public void initialize() {
-        switch (simPaneCtrl.getParamValueIndex(PARAM_ENV)) {
+        switch (taskPaneCtrl.getParamValueIndex(PARAM_ENV)) {
             case 0:
                 env = new VacuumEnvironment();
                 break;
             case 1:
                 env = new NondeterministicVacuumEnvironment();
                 break;
+            case 2:
+                env = new MazeVacuumEnvironment(5, 5, 0.2);
+                break;
         }
         agent = null;
-        switch (simPaneCtrl.getParamValueIndex(PARAM_AGENT)) {
+        switch (taskPaneCtrl.getParamValueIndex(PARAM_AGENT)) {
             case 0:
                 agent = new TableDrivenVacuumAgent();
                 break;
@@ -115,46 +114,42 @@ public class VacuumAgentApp extends IntegrableApplication {
                 agent = new ModelBasedReflexVacuumAgent();
                 break;
             case 4:
-                agent = createNondeterministicVacuumAgent();
+                agent = new NondeterministicSearchAgent<>(VacuumWorldFunctions::getState, env);
+                break;
+            case 5:
+                agent = new RandomWalkVacuumAgent();
                 break;
         }
         if (env != null && agent != null) {
             envViewCtrl.initialize(env);
-            env.addEnvironmentView(envViewCtrl);
+            env.addEnvironmentListener(envViewCtrl);
             env.addAgent(agent);
-            if (agent instanceof NondeterministicVacuumAgent) {
-                // Set the problem now for this kind of agent
-                ((NondeterministicVacuumAgent) agent).setProblem(createNondeterministicProblem());
-            }
         }
     }
 
     /**
      * Starts the experiment.
      */
-    public void simulate() {
-        while (!env.isDone() && !CancelableThread.currIsCanceled()) {
+    @SuppressWarnings("unchecked")
+    public void startExperiment() {
+        if (agent instanceof NondeterministicSearchAgent) {
+            NondeterministicProblem<VacuumEnvironmentState, Action> problem =
+                    new NondeterministicProblem<>((VacuumEnvironmentState) env.getCurrentState(),
+                            VacuumWorldFunctions::getActions, VacuumWorldFunctions.createResultsFunctionFor(agent),
+                            VacuumWorldFunctions::testGoal, (s, a, sPrimed) -> 1.0);
+            // Set the problem now for this kind of agent
+            ((NondeterministicSearchAgent<VacuumPercept, VacuumEnvironmentState, Action>) agent).makePlan(problem);
+        }
+        while (!env.isDone() && !Tasks.currIsCancelled()) {
             env.step();
-            simPaneCtrl.setStatus("Performance=" + env.getPerformanceMeasure(agent));
-            simPaneCtrl.waitAfterStep();
+            taskPaneCtrl.setStatus("Performance=" + env.getPerformanceMeasure(agent));
+            taskPaneCtrl.waitAfterStep();
         }
         envViewCtrl.notify("Performance=" + env.getPerformanceMeasure(agent));
     }
 
     @Override
     public void cleanup() {
-        simPaneCtrl.cancelSimulation();
-    }
-
-    // helper methods...
-
-    private NondeterministicVacuumAgent createNondeterministicVacuumAgent() {
-        return new NondeterministicVacuumAgent(
-                new FullyObservableVacuumEnvironmentPerceptToStateFunction());
-    }
-
-    private NondeterministicProblem createNondeterministicProblem() {
-        return new NondeterministicProblem(env.getCurrentState(), new VacuumWorldActions(),
-                new VacuumWorldResults(agent), new VacuumWorldGoalTest(agent), new DefaultStepCostFunction());
+        taskPaneCtrl.cancelExecution();
     }
 }

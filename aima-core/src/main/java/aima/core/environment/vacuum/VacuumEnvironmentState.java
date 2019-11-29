@@ -2,6 +2,7 @@ package aima.core.environment.vacuum;
 
 import aima.core.agent.Agent;
 import aima.core.agent.EnvironmentState;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -10,8 +11,9 @@ import java.util.Map;
  * 
  * @author Ciaran O'Reilly
  * @author Andrew Brown
+ * @author Ruediger Lunde
  */
-public class VacuumEnvironmentState implements EnvironmentState, FullyObservableVacuumEnvironmentPercept, Cloneable {
+public class VacuumEnvironmentState implements EnvironmentState, Cloneable {
 
 	private Map<String, VacuumEnvironment.LocationState> state;
 	private Map<Agent, String> agentLocations;
@@ -20,56 +22,35 @@ public class VacuumEnvironmentState implements EnvironmentState, FullyObservable
 	 * Constructor
 	 */
 	public VacuumEnvironmentState() {
-		state = new LinkedHashMap<String, VacuumEnvironment.LocationState>();
-		agentLocations = new LinkedHashMap<Agent, String>();
+		state = new LinkedHashMap<>();
+		agentLocations = new LinkedHashMap<>();
 	}
 
-	/**
-	 * Constructor
-	 * 
-	 * @param locAState
-	 * @param locBState
-	 */
-	public VacuumEnvironmentState(VacuumEnvironment.LocationState locAState,
-			VacuumEnvironment.LocationState locBState) {
-		this();
-		state.put(VacuumEnvironment.LOCATION_A, locAState);
-		state.put(VacuumEnvironment.LOCATION_B, locBState);
-	}
-
-	@Override
-	public String getAgentLocation(Agent a) {
-		return agentLocations.get(a);
+	public String getAgentLocation(Agent agent) {
+		return agentLocations.get(agent);
 	}
 
 	/**
 	 * Sets the agent location
-	 * 
-	 * @param a
-	 * @param location
 	 */
-	public void setAgentLocation(Agent a, String location) {
-		agentLocations.put(a, location);
+	public void setAgentLocation(Agent agent, String location) {
+		agentLocations.put(agent, location);
 	}
 
-	@Override
 	public VacuumEnvironment.LocationState getLocationState(String location) {
 		return state.get(location);
 	}
 
 	/**
 	 * Sets the location state
-	 * 
-	 * @param location
-	 * @param s
 	 */
-	public void setLocationState(String location, VacuumEnvironment.LocationState s) {
-		state.put(location, s);
+	public void setLocationState(String location, VacuumEnvironment.LocationState locState) {
+		state.put(location, locState);
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (getClass() == obj.getClass()) {
+		if (obj != null && getClass() == obj.getClass()) {
 			VacuumEnvironmentState s = (VacuumEnvironmentState) obj;
 			return state.equals(s.state) && agentLocations.equals(s.agentLocations);
 		}
@@ -91,8 +72,8 @@ public class VacuumEnvironmentState implements EnvironmentState, FullyObservable
 		VacuumEnvironmentState result = null;
 		try {
 			result = (VacuumEnvironmentState) super.clone();
-			result.state = new LinkedHashMap<String, VacuumEnvironment.LocationState>(state);
-			agentLocations = new LinkedHashMap<Agent, String>(agentLocations);
+			result.state = new LinkedHashMap<>(state);
+			agentLocations = new LinkedHashMap<>(agentLocations);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -106,6 +87,17 @@ public class VacuumEnvironmentState implements EnvironmentState, FullyObservable
 	 */
 	@Override
 	public String toString() {
-		return this.state.toString();
+		StringBuilder builder = new StringBuilder("{");
+		for (Map.Entry<String, VacuumEnvironment.LocationState> entity : state.entrySet()) {
+			if (builder.length() > 2) builder.append(", ");
+			builder.append(entity.getKey()).append("=").append(entity.getValue());
+		}
+		int i = 0;
+		for (Map.Entry<Agent, String> entity : agentLocations.entrySet()) {
+			if (builder.length() > 2) builder.append(", ");
+			builder.append("Loc").append(++i).append("=").append(entity.getValue());
+		}
+		builder.append("}");
+		return builder.toString();
 	}
 }
